@@ -30,6 +30,7 @@ ed
 elvis
 etc
 eudev
+exfatprogs
 file
 findutils
 floppy
@@ -39,16 +40,18 @@ gc
 #ghostscript
 #ghostscript-fonts-std
 glibc
-#glibc-solibs
+glibc-profile
+glibc-solibs
 glibc-zoneinfo
 gnupg
 gnupg2
 gnutls
+gperf
 gpgme
 gpm
 gptfdisk
 grep
-#groff
+groff
 gzip
 haveged
 hostname
@@ -58,6 +61,7 @@ inotify-tools
 iproute2
 iptables
 iputils
+jemalloc
 kbd
 kernel-generic
 kernel-firmware
@@ -85,6 +89,7 @@ links
 logrotate
 lvm2
 lz4
+lzip
 lzlib
 #man
 #man-db

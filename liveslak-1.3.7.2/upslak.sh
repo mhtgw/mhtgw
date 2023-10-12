@@ -544,10 +544,12 @@ parse_template() {
     -e "s/@PERSISTENCE@/${PERSISTENCE:-persistence}/g" \
     -e "s/@DARKSTAR@/${LIVE_HOSTNAME:-darkstar}/g" \
     -e "s/@LIVEUID@/${LIVEUID:-live}/g" \
+    -e "s/@LIVEUIDNR@/${LIVEUIDNR:-1000}/g" \
     -e "s/@DISTRO@/$DISTRO/g" \
     -e "s/@CDISTRO@/${DISTRO^}/g" \
     -e "s/@UDISTRO@/${DISTRO^^}/g" \
     -e "s/@VERSION@/${VERSION}/g" \
+    -e "s/@KVER@/$KVER/g" \
     -e "s/@SQ_EXT_AVAIL@/${SQ_EXT_AVAIL}/g" \
     -e "s,@DEF_KBD@,${DEF_KBD},g" \
     -e "s,@DEF_LOCALE@,${DEF_LOCALE},g" \

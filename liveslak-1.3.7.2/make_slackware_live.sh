@@ -384,7 +384,7 @@ function install_pkgs() {
   if [ "$3" = "local" -a -d ${LIVE_TOOLDIR}/local${DIRSUFFIX}/$1 ]; then
     echo "-- Installing local packages from subdir 'local${DIRSUFFIX}/$1'."
     #installpkg --terse --root "$2" "${LIVE_TOOLDIR}/local${DIRSUFFIX}/$1/*.t?z"
-    ROOT="$2" upgradepkg --install-new --reinstall "${LIVE_TOOLDIR}/local${DIRSUFFIX}/$1/*.t?z"
+    ROOT="$2" upgradepkg --install-new --reinstall "${LIVE_TOOLDIR}"/local${DIRSUFFIX}/"$1"/*.t?z
   else
     # Load package list and (optional) custom repo info:
     if [ "$3" = "tagfile" ]; then
@@ -510,42 +510,43 @@ function install_pkgs() {
     # Also remove man pages:
     rm -rf "$2"/usr/man
   fi
+  # Commented as it is removing some libraries needed for development
   if [ "$LIVEDE" = "XFCE" ]; then
     # By pruning stuff that no one likely needs anyway,
     # we make room for packages we would otherwise not be able to add.
     # MySQL embedded is only used by Amarok:
     rm -f "$2"/usr/bin/mysql*embedded*
     # Also remove the big unused/esoteric static libraries:
-    rm -f "$2"/usr/lib${DIRSUFFIX}/*.a
+    #rm -f "$2"/usr/lib${DIRSUFFIX}/*.a
     # This was inadvertantly left in the gcc package:
-    rm -f "$2"/usr/libexec/gcc/*/*/cc1objplus
+    #rm -f "$2"/usr/libexec/gcc/*/*/cc1objplus
     # From samba we mostly want the shared runtime libraries:
     rm -rf "$2"/usr/share/samba
     rm -rf "$2"/usr/lib${DIRSUFFIX}/python*/site-packages/samba
     # Guile library is all we need to satisfy make:
-    rm -f "$2"/usr/bin/guil*
-    rm -rf "$2"/usr/include/guile
-    rm -rf "$2"/usr/lib64/guile
-    rm -rf "$2"/usr/share/guile
+    #rm -f "$2"/usr/bin/guil*
+    #rm -rf "$2"/usr/include/guile
+    #rm -rf "$2"/usr/lib64/guile
+    #rm -rf "$2"/usr/share/guile
     # I am against torture:
     rm -f "$2"/usr/bin/smbtorture
     # From llvm we only want the shared runtime libraries so wipe the rest:
-    rm -f "$2"/usr/lib${DIRSUFFIX}/lib{LLVM,lldb}*.a
-    rm -rf "$2"/usr/lib${DIRSUFFIX}/libclang*
-    rm -rf "$2"/usr/include/{c++/v1,clang,clang-c,lldb,llvm,llvm-c}
-    rm -rf "$2"/usr/share/{clang,opt-viewer,scan-build,scan-view}
-    rm -rf "$2"/usr/lib${DIRSUFFIX}/cmake/{clang,llvm}
-    rm -rf "$2"/usr/lib${DIRSUFFIX}/clang
-    rm -rf "$2"/usr/lib${DIRSUFFIX}/python*/site-packages/{clang,lldb}
-    if [ -e "$2"/var/log/packages/llvm-[0-9]* ]; then
-      for BINFILE in $(grep /bin/. "$2"/var/log/packages/llvm-[0-9]*) ; do
-         rm -f "$2"/$BINFILE ; 
-      done
-    fi
+    #rm -f "$2"/usr/lib${DIRSUFFIX}/lib{LLVM,lldb}*.a
+    #rm -rf "$2"/usr/lib${DIRSUFFIX}/libclang*
+    #rm -rf "$2"/usr/include/{c++/v1,clang,clang-c,lldb,llvm,llvm-c}
+    #rm -rf "$2"/usr/share/{clang,opt-viewer,scan-build,scan-view}
+    #rm -rf "$2"/usr/lib${DIRSUFFIX}/cmake/{clang,llvm}
+    #rm -rf "$2"/usr/lib${DIRSUFFIX}/clang
+    #rm -rf "$2"/usr/lib${DIRSUFFIX}/python*/site-packages/{clang,lldb}
+    #if [ -e "$2"/var/log/packages/llvm-[0-9]* ]; then
+    #  for BINFILE in $(grep /bin/. "$2"/var/log/packages/llvm-[0-9]*) ; do
+    #     rm -f "$2"/$BINFILE ; 
+    #  done
+    #fi
     # Bye llvm; on with the rest:
-    rm -rf "$2"/usr/lib${DIRSUFFIX}/d3d
-    rm -rf "$2"/usr/lib${DIRSUFFIX}/guile
-    rm -rf "$2"/usr/share/icons/HighContrast
+    #rm -rf "$2"/usr/lib${DIRSUFFIX}/d3d
+    #rm -rf "$2"/usr/lib${DIRSUFFIX}/guile
+    #rm -rf "$2"/usr/share/icons/HighContrast
     # Nor these datacenter NIC firmwares and drivers:
     rm -rf "$2"/lib/firmware/{bnx*,cxgb4,libertas,liquidio,mellanox,netronome,qed}
     rm -rf "$2"/lib/modules/*/kernel/drivers/infiniband
@@ -644,6 +645,7 @@ function gen_bootmenu() {
     -e "s/@LANG@/${DEF_LANG}/g" \
     -e "s/@ULANG@/${DEF_LANG^^}/g" \
     -e "s,@LOCALE@,${DEF_LOCALE},g" \
+    -e "s,@TZ@,${DEF_TZ},g" \
     -e "s/@CONSFONT@/$CONSFONT/g" \
     -e "s/@DIRSUFFIX@/$DIRSUFFIX/g" \
     -e "s/@DISTRO@/$DISTRO/g" \
@@ -1481,10 +1483,10 @@ echo "LANG=${DEF_LOCALE}" > ${LIVE_ROOTDIR}/etc/locale.conf
 echo "KEYMAP=${DEF_KBD}" > ${LIVE_ROOTDIR}/etc/vconsole.conf
 
 # Set timezone to UTC, mimicking the 'timeconfig' script in Slackware:
-cp -a ${LIVE_ROOTDIR}/usr/share/zoneinfo/UTC ${LIVE_ROOTDIR}/etc/localtime
+ln -sf /usr/share/zoneinfo/UTC ${LIVE_ROOTDIR}/etc/localtime
 # Could be absent so 'rm -f' to avoid script aborts:
 rm -f ${LIVE_ROOTDIR}/etc/localtime-copied-from
-ln -s /usr/share/zoneinfo/UTC ${LIVE_ROOTDIR}/etc/localtime-copied-from
+#ln -s /usr/share/zoneinfo/UTC ${LIVE_ROOTDIR}/etc/localtime-copied-from
 
 # Qt5 expects '/etc/localtime' to be a symlink, but in Slackware this is a
 # real file.  This causes Qt5 timezone detection to fail so that "UTC"
@@ -1524,19 +1526,20 @@ chmod +x ${LIVE_ROOTDIR}/etc/rc.d/rc.font
 cat <<"EOM" > ${LIVE_ROOTDIR}/etc/rc.d/rc.gpm
 #!/bin/sh
 # Start/stop/restart the GPM mouse server:
-[ ! -x /usr/sbin/gpm ] && return
-MTYPE="imps2"
-if [ "$1" = "stop" ]; then
-  echo "Stopping gpm..."
-  /usr/sbin/gpm -k
-elif [ "$1" = "restart" ]; then
-  echo "Restarting gpm..."
-  /usr/sbin/gpm -k
-  sleep 1
-  /usr/sbin/gpm -m /dev/mouse -t ${MTYPE}
-else # assume $1 = start:
-  echo "Starting gpm:  /usr/sbin/gpm -m /dev/mouse -t ${MTYPE}"
-  /usr/sbin/gpm -m /dev/mouse -t ${MTYPE}
+if [ -x /usr/sbin/gpm ]; then
+  MTYPE="imps2"
+  if [ "$1" = "stop" ]; then
+    echo "Stopping gpm..."
+    /usr/sbin/gpm -k
+  elif [ "$1" = "restart" ]; then
+    echo "Restarting gpm..."
+    /usr/sbin/gpm -k
+    sleep 1
+    /usr/sbin/gpm -m /dev/mouse -t ${MTYPE}
+  else # assume $1 = start:
+    echo "Starting gpm:  /usr/sbin/gpm -m /dev/mouse -t ${MTYPE}"
+    /usr/sbin/gpm -m /dev/mouse -t ${MTYPE}
+  fi
 fi
 EOM
 chmod +x ${LIVE_ROOTDIR}/etc/rc.d/rc.gpm
@@ -1570,15 +1573,19 @@ KERNEL=="loop*", ENV{UDISKS_PRESENTATION_HIDE}="1"
 KERNEL=="loop*", ENV{UDISKS_IGNORE}="1"
 EOL
 
-# Set a root password.
-echo "root:${ROOTPW}" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
+# Set a root password. Note 'chpasswd' sometimes segfaults in the first form.
+if ! echo "root:${ROOTPW}" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null; then
+  echo "root:${ROOTPW}" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
+fi
 
 # Create group and user for the nvidia persistence daemon:
 if ! chroot ${LIVE_ROOTDIR} /usr/bin/getent passwd ${NVUID} > /dev/null 2>&1 ;
 then
   chroot ${LIVE_ROOTDIR} /usr/sbin/groupadd -g ${NVGRPNR} ${NVGRP}
   chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "Nvidia persistence" -u ${NVUIDNR} -g ${NVGRPNR} -d /dev/null -s /bin/false ${NVUID}
-  echo "${NVUID}:$(openssl rand -base64 12)" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
+  if ! echo "${NVUID}:$(openssl rand -base64 12)" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null ; then
+    echo "${NVUID}:$(openssl rand -base64 12)" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
+  fi
 fi
 
 # Determine the full name of the live account in the image:
@@ -1591,7 +1598,9 @@ fi
 
 # Create a nonprivileged user account (called "live" by default):
 chroot ${LIVE_ROOTDIR} /usr/sbin/useradd -c "${LIVEUIDFN}" -g users -G wheel,audio,cdrom,floppy,plugdev,video,power,netdev,lp,scanner,kmem,dialout,games,disk,input -u ${LIVEUIDNR} -d /home/${LIVEUID} -m -s /bin/bash ${LIVEUID}
-echo "${LIVEUID}:${LIVEPW}" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
+if ! echo "${LIVEUID}:${LIVEPW}" | /usr/sbin/chpasswd -R ${LIVE_ROOTDIR} 2>/dev/null ; then
+  echo "${LIVEUID}:${LIVEPW}" | chroot ${LIVE_ROOTDIR} /usr/sbin/chpasswd
+fi
 
 # Configure suauth if we are not on a PAM system (where this does not work):
 if [ ! -L ${LIVE_ROOTDIR}/lib${DIRSUFFIX}/libpam.so.? ]; then
@@ -1604,11 +1613,29 @@ fi
 
 # Configure sudoers:
 chmod 640 ${LIVE_ROOTDIR}/etc/sudoers
+# Slackware 14.2:
 sed -i ${LIVE_ROOTDIR}/etc/sudoers -e 's/# *\(%wheel\sALL=(ALL)\sALL\)/\1/'
+# Slackware 15.0:
+sed -i ${LIVE_ROOTDIR}/etc/sudoers -e 's/# *\(%wheel\sALL=(ALL:ALL)\sALL\)/\1/'
 chmod 440 ${LIVE_ROOTDIR}/etc/sudoers
+
+# Also treat members of the 'wheel' group as admins next to root:
+mkdir -p ${LIVE_ROOTDIR}/etc/polkit-1/rules.d
+cat <<EOT > ${LIVE_ROOTDIR}/etc/polkit-1/rules.d/10-wheel-admin.rules
+polkit.addAdminRule(function(action, subject) {
+    return ["unix-group:wheel"];
+});
+EOT
 
 # Add some convenience to the bash shell:
 mkdir -p  ${LIVE_ROOTDIR}/etc/skel/
+cat << "EOT" > ${LIVE_ROOTDIR}/etc/skel/.bashrc
+# If not running interactively, don't do anything
+[ -z "$PS1" ] && return
+# Check the window size after each command and, if necessary,
+# update the values of LINES and COLUMNS.
+shopt -s checkwinsize
+EOT
 cat << "EOT" > ${LIVE_ROOTDIR}/etc/skel/.profile
 # Source a .bashrc if it exists:
 [[ -r ~/.bashrc ]] && . ~/.bashrc
@@ -1674,6 +1701,8 @@ DEBUG_ETH_UP="no"
 EOT
 fi
 
+# First disable any potentially incorrect mirror for slackpkg:
+sed -e "s/^ *\([^#]\)/#\1/" -i ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
 # Enable a Slackware mirror for slackpkg:
 cat <<EOT >> ${LIVE_ROOTDIR}/etc/slackpkg/mirrors
 #http://mirrors.slackware.com/slackware/slackware${DIRSUFFIX}-${SL_VERSION}/
@@ -1731,10 +1760,10 @@ if [ "${SL_VERSION}" = "current" ]; then
   touch /var/lib/slackpkg/current
 fi
 
-ARCH=${SL_ARCH} /usr/sbin/slackpkg -batch=on update gpg
-ARCH=${SL_ARCH} /usr/sbin/slackpkg -batch=on update
+#ARCH=${SL_ARCH} /usr/sbin/slackpkg -batch=on update gpg
+#ARCH=${SL_ARCH} /usr/sbin/slackpkg -batch=on update
 # Let any lingering .new files replace their originals:
-yes o | ARCH=${SL_ARCH} /usr/sbin/slackpkg new-config
+#yes o | ARCH=${SL_ARCH} /usr/sbin/slackpkg new-config
 
 EOSL
 
@@ -1840,6 +1869,7 @@ if [ -f ${DEF_SL_PKGROOT}/../isolinux/initrd.img ]; then
       -e "s/@LIVEDE@/$LIVEDE/g" \
       -e "s/@LIVEMAIN@/$LIVEMAIN/g" \
       -e "s/@LIVEUID@/$LIVEUID/g" \
+      -e "s/@LIVEUIDNR@/$LIVEUIDNR/g" \
       -e "s/@MARKER@/$MARKER/g" \
       -e "s/@SL_VERSION@/$SL_VERSION/g" \
       -e "s/@VERSION@/$VERSION/g" \
@@ -1856,6 +1886,7 @@ if [ -f ${DEF_SL_PKGROOT}/../isolinux/initrd.img ]; then
     -e "s/@LIVEDE@/$LIVEDE/g" \
     -e "s/@LIVEMAIN@/$LIVEMAIN/g" \
     -e "s/@LIVEUID@/$LIVEUID/g" \
+    -e "s/@LIVEUIDNR@/$LIVEUIDNR/g" \
     -e "s/@MARKER@/$MARKER/g" \
     -e "s/@SL_VERSION@/$SL_VERSION/g" \
     -e "s/@VERSION@/$VERSION/g" \
@@ -2132,7 +2163,7 @@ KDESU_EOF
 Driver=QSQLITE
 
 [QSQLITE]
-Name=/home/live/.local/share/akonadi/akonadi.db
+Name=/home/${LIVEUID}/.local/share/akonadi/akonadi.db
 AKONADI_EOF
 
   # Disable baloo:
@@ -2691,6 +2722,18 @@ else
   LOCATE_BIN=slocate
 fi
 chroot ${LIVE_ROOTDIR} /etc/cron.daily/${LOCATE_BIN} 2>${DBGOUT}
+
+# customization: added to support trash folder functionality in XFCE
+mkdir -p ${LIVE_ROOTDIR}/.Trash-1000
+mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Desktop
+mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Documents
+mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/Downloads
+mkdir -p ${LIVE_ROOTDIR}/home/${LIVEUID}/.local/share/Trash
+if [ -d ${LIVE_TOOLDIR}/files_to_copy ]; then
+   echo "-- Copying files from ${LIVE_TOOLDIR}/files_to_copy to ${LIVE_ROOTDIR}..."
+   cp -a ${LIVE_TOOLDIR}/files_to_copy/* ${LIVE_ROOTDIR}/
+fi
+chroot ${LIVE_ROOTDIR} chown -R  ${LIVEUID}:users /.Trash-1000 /home/${LIVEUID}
 
 # -----------------------------------------------------------------------------
 # Done with configuring the live system!

@@ -190,6 +190,8 @@ then
         fi
       fi
     fi
+    # Let's ensure the proper ownership:
+    chroot ${T_PX} /usr/bin/chown -R ${UACCTNR} /home/${UACCOUNT}
 
     # Remove the marker file from the filesystem root:
     rm -f ${T_PX}/@MARKER@

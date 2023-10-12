@@ -1,9 +1,12 @@
+Greybird
 Thunar
+elementary-xfce
 exo
 garcon
 gtk-xfce-engine
 libxfce4ui
 libxfce4util
+mousepad
 #orage
 thunar
 thunar-volman
@@ -23,7 +26,10 @@ xfce4-systemload-plugin
 xfce4-taskmanager
 xfce4-terminal
 xfce4-volumed
-#xfce4-weather-plugin
+xfce4-weather-plugin
+xfce4-whiskermenu-plugin
 xfconf
 xfdesktop
 xfwm4
+meld
+vlc

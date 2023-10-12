@@ -10,7 +10,7 @@ blueman
 cairomm
 #farstream
 fltk
-geeqie
+#geeqie
 #gftp
 #gimp
 gkrellm
@@ -26,7 +26,7 @@ libcue
 #libnice
 libnma
 libsigc++
-#lftp
+lftp
 mozilla-firefox
 #mozilla-thunderbird
 network-manager-applet
@@ -39,17 +39,19 @@ rxvt
 rxvt-unicode
 #sane
 seamonkey-solibs
-tigervnc
+#tigervnc
 #vim
 #vim-gvim
 x11-ssh-askpass
 #x3270
 #xaos
 #xfractint
-xgames
+#xgames
 #xlockmore
 #xmms
 #xpaint
+xorriso
 # Now needs qt:
 #xpdf
+# Needs gimp:
 #xsane
