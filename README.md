@@ -19,7 +19,7 @@ The idea of this approach is that only one specific framework is used for all so
   - less bugs
   - no complexity involved
 
-MHTGW will be based on only Linux 2.6.35.14
+MHTGW will be based on only Linux 2.6.32.71
 
 The inspiration came from Andrew S Tanenbaum's speech of code complexity:
 https://www.youtube.com/watch?v=jMkR9VF2GNY (EuroBSDcon - A reimplementation of NetBSD based on a microkernel - Andy Tanenbaum)
