@@ -21,7 +21,7 @@ The idea of this approach is that only one specific framework is used for all so
 
 MHTGW will be based on only two linux versions
   - Minix 3.3.0
-  - Linux 2.6.38.8
+  - Linux 3.2.102
 
 The inspiration came from Andrew S Tanenbaum's speech of code complexity:
 https://www.youtube.com/watch?v=jMkR9VF2GNY (EuroBSDcon - A reimplementation of NetBSD based on a microkernel - Andy Tanenbaum)
