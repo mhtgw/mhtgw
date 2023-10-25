@@ -1,10 +1,11 @@
-MHT GateWay is a router/gateway software primarily that is used for home/office purposes.
+MHT GateWay is a router/gateway software primarily that is used for home/office purposes with a simple desktop for accesing the internet and the system's console.
 
-The key differentiator between other router/gateway software in the market and MHT Gateway is that it uses a kernel specific appraoch where there will not be too many moving software components.
+The key differentiator between other router/gateway software in the market and MHT Gateway is that it uses a kernel specific approach where there will not be too many moving software components.
 MHT GateWay will have 3 layers to the minimum.
   - Kernel layer
-  - System Application Layer
-    - these are system applications that are built directly on top of the Kernel which are custom built that are tied together as a single package and are not provided as separate software.
+  - System Application Layer (based on ToyBox, other system utilities)
+    - there will also be other system applications that are custom built that are tied together as a single package and are not provided as separate software.
+  - Desktop GUI (based on XFCE)
   - Toolchain is given additionally to expand the functionality.
 
 if any further additional programs are needed then the user has the flexibility to compile and install the additional software.
