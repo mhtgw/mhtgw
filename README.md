@@ -1,1 +1,32 @@
+MHT GateWay is a router/gateway software primarily that is used for home/office purposes.
 
+The key differentiator between other router/gateway software in the market and MHT Gateway is that it uses a kernel specific appraoch where there will not be too many moving software components.
+MHT GateWay will have 3 layers to the minimum.
+  - Kernel layer
+  - System Application Layer
+    - these are system applications that are built directly on top of the Kernel which are custom built that are tied together as a single package and are not provided as separate software.
+  - Toolchain is given additionally to expand the functionality.
+
+if any further additional programs are needed then the user has the flexibility to compile and install the additional software.
+
+This is something like you are purchasing something (i.e., a home or a dog) to keep it simple.
+
+The current router/gateway software in the market get different software from different sources and package them and provide it to the end user. This is more robust and more advanced where individual companies/developers create their own framework and provide each software that is compiled/packaged and provided to the consumer.
+
+The idea of this approach is that only one specific framework is used for all software that is used in the router/gateway. though they do not provide the complete feature set at the initiation. they are:
+  - less maintainence
+  - less bugs
+  - no complexity involved
+
+MHTGW will be based on only two linux versions
+  - Minix 3.3.0
+  - Linux 2.6.38.8
+
+The inspiration came from Andrew S Tanenbaum's speech of code complexity:
+https://www.youtube.com/watch?v=jMkR9VF2GNY (EuroBSDcon - A reimplementation of NetBSD based on a microkernel - Andy Tanenbaum)
+
+**FAQ:**
+Why only one linux kernel version?
+The idea is to learn linux and enhance the kernel to different platforms as if it was a purchased kernel. we believe in one kernel from Linus Torvalds and the Linux Foundation.
+
+**Looking for C/Core Java Developers who can be part of the project. Please feel free to email at ramesh at gk at hotmail dot com.**
