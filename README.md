@@ -28,4 +28,11 @@ https://www.youtube.com/watch?v=jMkR9VF2GNY (EuroBSDcon - A reimplementation of 
 Why only one linux kernel version?
 The idea is to learn linux and enhance the kernel to different platforms as if it was a purchased kernel. we believe in one kernel from Linus Torvalds and the Linux Foundation.
 
+DHCP/DNS Functionality
+There will be 4 types of profiles of users
+- with full internet access.
+- without ads.
+- with restricted sites access.
+- without internet at all.
+
 **Looking for C/Core Java Developers who can be part of the project. Please feel free to email at ramesh at gk at hotmail dot com.**
