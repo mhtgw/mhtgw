@@ -19,7 +19,7 @@ The idea of this approach is that only one specific framework is used for all so
   - less bugs
   - no complexity involved
 
-Kernel 3.19.8 is used as the main build system kernel. And kernel's supported would be from 2.6.x to 4.20.x.
+Kernel 3.19.8 is used as the main build system kernel.
 
 The inspiration came from Andrew S Tanenbaum's speech of code complexity:
 https://www.youtube.com/watch?v=jMkR9VF2GNY (EuroBSDcon - A reimplementation of NetBSD based on a microkernel - Andy Tanenbaum)
