@@ -1,0 +1,150 @@
+pkgname="kernel-headers"
+pkgver="5.8.18"
+pkgver_aufs="5.8"
+source=("https://mirrors.edge.kernel.org/pub/linux/kernel/v${pkgver:0:1}.x/linux-$pkgver.tar.gz"
+        "https://github.com/sfjro/aufs-standalone/archive/refs/heads/aufs${pkgver_aufs}.zip")
+
+build() {
+  local pkgver_ver_major=${pkgver:0:1}
+  local aufs_dir=$(ls -d aufs*/)
+  aufs_dir=${aufs_dir//\/}
+  echo "aufs_dir : $aufs_dir"
+  mv $aufs_dir aufs-${pkgver_aufs}
+  #mv $CWD/linux $CWD/linux-${pkgver}
+  #default kernel source build
+  if [ -d $CWD/aufs-${pkgver_aufs} ];  then
+    #m_package_source_package_apply_patch "$CWD/linux-${pkgver}" "${startdir}/linux-${pkgver}_patch_aufs_pre"
+    cd $CWD/linux-${pkgver}
+    # --- aufs pre patch - start
+    if [ -f ${startdir}/linux-${pkgver}-patch-for-aufs-pre.patch ]; then
+      echo "applying patch : ${startdir}/linux-${pkgver}-patch-for-aufs-pre.patch"
+      patch -p1 < ${startdir}/linux-${pkgver}-patch-for-aufs-pre.patch || exit 1
+      echo "${startdir}/linux-${pkgver}-patch-for-aufs-pre.patch" >> $CWD/.m_applied_patch
+    fi
+    # --- aufs pre patch - end
+    local pkgver_ver_major="${pkgver:0:1}"
+    echo "applying aufs patch : aufs${pkgver_ver_major}-kbuild.patch ..."
+    patch -p1 < $CWD/aufs-${pkgver_aufs}/aufs${pkgver_ver_major}-kbuild.patch || exit 1
+    echo "applying aufs patch : aufs${pkgver_ver_major}-base.patch ..."
+    patch -p1 < $CWD/aufs-${pkgver_aufs}/aufs${pkgver_ver_major}-base.patch || exit 1
+    if [ -f $CWD/aufs-${pkgver_aufs}/aufs${pkgver_ver_major}-proc_map.patch ]; then
+      echo "applying aufs patch : aufs${pkgver_ver_major}-proc_map.patch ..."
+      patch -p1 < $CWD/aufs-${pkgver_aufs}/aufs${pkgver_ver_major}-proc_map.patch || exit 1
+    else
+      echo "applying aufs patch : aufs${pkgver_ver_major}-mmap.patch ..."
+      patch -p1 < $CWD/aufs-${pkgver_aufs}/aufs${pkgver_ver_major}-mmap.patch || exit 1
+    fi
+    echo "applying aufs patch : aufs${pkgver_ver_major}-standalone.patch ..."
+    patch -p1 < $CWD/aufs-${pkgver_aufs}/aufs${pkgver_ver_major}-standalone.patch || exit 1
+    if [[ "${pkgver_ver_major}" == "3" ]] || [[ "${pkgver_ver_major}" == "4" ]]; then
+      if [ -f include/uapi/linux/Kbuild ]; then
+        echo "header-y += aufs_type.h" >> include/uapi/linux/Kbuild
+      fi
+      if [ -f include/linux/Kbuild ]; then
+        echo "header-y += aufs_type.h" >> include/linux/Kbuild
+      fi
+    fi
+    cp -av $CWD/aufs-${pkgver_aufs}/Documentation ./
+    cp -av $CWD/aufs-${pkgver_aufs}/fs ./
+    if [ -f $CWD/aufs-${pkgver_aufs}/include/uapi/linux/aufs_type.h ]; then
+      cp -av $CWD/aufs-${pkgver_aufs}/include/uapi/linux/aufs_type.h ./include/uapi/linux/
+    fi
+    if [ -f $CWD/aufs-${pkgver_aufs}/include/linux/aufs_type.h ]; then
+      cp -av $CWD/aufs-${pkgver_aufs}/include/linux/aufs_type.h ./include/linux/
+    fi
+
+    # The sed fixes are from gentoo portage build.
+    #sed -i "s:aufs.ko usr/include/uapi/linux/aufs_type.h:aufs.ko:g" Makefile
+    #sed -i "s:aufs.ko usr/include/linux/aufs_type.h:aufs.ko:g" Makefile
+    #sed -i "s:__user::g" include/uapi/linux/aufs_type.h
+    #https://gitlab.kses.net/guinnux/pkgbuild/-/blob/4de84d0589197dc12ac3fc8aa877b1793b3c845f/core/linux-armv5/0001-AUFS-fix-for-3.18.1.patch
+    #sed -i 's/d_u.d_child/d_child/' fs/aufs/dcsub.c fs/aufs/hnotify.c
+    #sed -i 's/ d_alias/ d_u.d_alias/' fs/aufs/hnotify.c fs/aufs/export.c fs/aufs/debug.c
+    # --- aufs post patch - start
+    #if [ -f ${startdir}/linux-${pkgver}-patch-for-aufs-post.patch ]; then
+    #  echo "applying patch : ${startdir}/linux-${pkgver}-patch-for-aufs-post.patch"
+    #  patch -p1 < ${startdir}/linux-${pkgver}-patch-for-aufs-post.patch || exit 1
+    #  echo "${startdir}/linux-${pkgver}-patch-for-aufs-post.patch" >> $CWD/.m_applied_patch
+    #fi
+    # --- aufs post patch - end
+    #m_package_source_package_apply_patch "$CWD/linux-${pkgver}" "${startdir}/linux-${pkgver}_patch_aufs_post"
+    cd $CWD
+  fi
+  # end of aufs specific configuration
+
+  if [ -f $CWD/linux-${pkgver}/localversion-cip ]; then
+    rm -f $CWD/linux-${pkgver}/localversion-cip
+  fi
+
+  #export CFLAGS="$MHTGW_CFLAGS" CXXFLAGS="$MHTGW_CXXFLAGS" LDFLAGS="$MHTGW_LDFLAGS"
+
+  cd $CWD/linux-${pkgver}
+
+  if [ -f ${startdir}/linux-${pkgver}.config ]; then
+    cp -av ${startdir}/linux-${pkgver}.config .config
+  else
+    touch ${startdir}/linux-${pkgver}.config
+    make -j1 defconfig
+  fi
+  make -j1 oldconfig
+
+  if ! diff .config ${startdir}/linux-${pkgver}.config >/dev/null 2>&1; then
+     cp -av ${startdir}/linux-${pkgver}.config ${startdir}/linux-${pkgver}.config.$(date +%Y%m%d%H%M%S)
+     cp -av .config ${startdir}/linux-${pkgver}.config
+  fi
+
+  if [ -d /usr/src/linux-${pkgver} ]; then
+    echo "removing existing source at /usr/src/linux-${pkgver}"
+    rm -rf /usr/src/linux-${pkgver}
+    sync
+  fi
+  mv $CWD/linux-${pkgver} /usr/src/;
+  sync
+  ln -sf linux-${pkgver} /usr/src/linux;
+  #default kernel source build
+
+  if [[ ${pkgname} == *kernel-source* ]]; then
+    install -d $PKG/usr/src;
+    cp -a /usr/src/linux-${pkgver} $PKG/usr/src/;
+    sync
+    ln -sf linux-${pkgver} $PKG/usr/src/linux;
+  fi
+  
+  if [[ ${pkgname} == *kernel-headers* ]] || [[ ${pkgname} == *kernel-linux* ]]; then
+    if [ ! -d /usr/src/linux-${pkgver} ]; then
+      echo "linux source directory /usr/src/linux-${pkgver} does not exist!";
+      exit 1;
+    fi
+    cd /usr/src/linux-${pkgver} || exit 1
+    install -d $PKG/usr
+    make -j1 prepare
+    make -j1 mrproper
+    make -j1 headers_check
+    make -j1 INSTALL_HDR_PATH=$PKG/usr headers_install
+  fi
+  
+  # kernel-linux uses kernel-headers to do a pre-check
+  if [[ ${pkgname} == *kernel-linux* ]]; then
+    #remove directory created by kernel-headers as pre-check
+    rm -rf $PKG/usr
+    if [ ! -d /usr/src/linux-${pkgver} ]; then
+      echo "linux source directory /usr/src/linux-${pkgver} does not exist!";
+      exit 1;
+    fi
+    cd /usr/src/linux-${pkgver} || exit 1
+    make -j1 all;
+    make -j1 modules_install;
+    install -d $PKG/boot;
+    install -d $PKG/lib/modules;
+    cp -av /usr/src/linux-${pkgver}/arch/${kernel_arch}/boot/bzImage $PKG/boot/vmlinuz;
+    cp -av /usr/src/linux-${pkgver}/System.map $PKG/boot/System.map;
+    cp -av /usr/src/linux-${pkgver}/.config $PKG/boot/config-${pkgver};
+    cp -av /lib/modules/${pkgver} $PKG/lib/modules/;
+  fi
+
+  echo "cleaning up ..."
+  rm -rf /usr/src/linux-${pkgver}
+  rm -f /usr/src/linux
+	
+  unset pkgver_aufs
+}
