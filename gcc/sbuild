@@ -1,0 +1,117 @@
+pkgname="gcc"
+pkgver="4.8.4"
+source=(https://ftp.gnu.org/gnu/gcc/gcc-$pkgver/gcc-$pkgver.tar.gz
+        gcc-${pkgver}-retpoline-patches.patch
+        https://sourceware.org/pub/java/ecj-${pkgver:0:3}.jar
+        https://repo1.maven.org/maven2/org/antlr/antlr-runtime/3.5.3/antlr-runtime-3.5.3.jar)
+
+#gcc-5.x
+#https://github.com/hjl-tools/gcc/compare/ba9cddfdab8b539b788cd6fe0171351ae43c32da..d525f7d3ea41d13ff50c7c264eb173fb09bd4c3c.patch
+#https://github.com/hjl-tools/gcc/commit/ba9cddfdab8b539b788cd6fe0171351ae43c32da
+#https://github.com/hjl-tools/gcc/commit/d525f7d3ea41d13ff50c7c264eb173fb09bd4c3c
+
+#gcc-4.9.x
+#https://github.com/hjl-tools/gcc/commit/d3191480f376c78031aa1ca0f6a54f4cf67f4268
+#https://github.com/hjl-tools/gcc/commit/e137c72d099f9b3b47f4cc718aa11eab14df1a9c
+#https://github.com/hjl-tools/gcc/compare/d3191480f376c78031aa1ca0f6a54f4cf67f4268..e137c72d099f9b3b47f4cc718aa11eab14df1a9c.patch
+
+#gcc-4.8.x
+#https://github.com/hjl-tools/gcc/commit/cf82a597b0d189857acb34a08725762c4f5afb50
+#https://github.com/hjl-tools/gcc/commit/abe6f0cd657b01494e653f64a62a67d03c89dfeb
+#https://github.com/hjl-tools/gcc/compare/cf82a597b0d189857acb34a08725762c4f5afb50..abe6f0cd657b01494e653f64a62a67d03c89dfeb.patch
+
+build() {
+  cp -av $CWD/ecj-${pkgver:0:3}.jar $CWD/gcc-$pkgver/ecj.jar
+  cp -av $CWD/antlr-runtime-3.5.3.jar $CWD/gcc-$pkgver/antlr-runtime.jar
+
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-retpoline-patches.patch || exit 1
+
+  mkdir gcc-build
+  cd gcc-build
+  ../gcc-$pkgver/configure  --prefix=/usr --enable-shared --build=${CHOST} --host=${CHOST} --target=${CHOST} \
+                --mandir=/usr/share/man --infodir=/usr/share/info --docdir=/usr/share/doc/${pkgname}-${pkgver} \
+                --libdir=/usr/lib${LIBDIRSUFFIX} --libexecdir=/usr/lib${LIBDIRSUFFIX} --includedir=/usr/include --sysconfdir=/etc \
+                --disable-nls --disable-debug --enable-bootstrap --enable-languages=c,c++,fortran,java,objc --enable-threads=posix \
+                --enable-__cxa_atexit --enable-clocale=gnu  --with-system-zlib --disable-multilib \
+                --enable-java-home --with-java-home=/usr/lib64/jvm/jre --with-jvm-root-dir=/usr/lib64/jvm --with-jvm-jar-dir=/usr/lib64/jvm/jvm-exports \
+                --with-antlr-jar=$CWD/gcc-$pkgver/antlr-runtime.jar --enable-java-awt=gtk --disable-gtktest --program-suffix=-${pkgver}
+  make bootstrap
+  make DESTDIR=${PKG} install
+
+  mkdir -p ${PKG}/lib
+  ln -sf ../usr/bin/cpp ${PKG}/lib/cpp
+  #ln -sf gcc ${PKG}/usr/bin/cc
+  #ln -sf g++ ${PKG}/usr/bin/c++
+  
+  mv -v ${PKG}/usr/lib64/gcc/*/${pkgver}/include-fixed/{limits.h,syslimits.h} ${PKG}/usr/lib64/gcc/*/${pkgver}/include/
+  
+  rm -f ${PKG}/usr/lib64/{libiberty.a,libstdc++.so.*-gdb.py}
+  
+  sed -i "s|-L$CWD/gcc-${pkgver}[^ ]* ||g" ${PKG}/usr/lib64/{libstdc++.la,libsupc++.la}
+  
+  ls -al ${PKG}/usr/bin > $CWD/gcc-$pkgver/.m_old_gcc_binary_files
+
+  mv    ${PKG}/usr/bin/aot-compile-${pkgver}     ${PKG}/usr/bin/${CHOST}-aot-compile-${pkgver};
+  rm -f ${PKG}/usr/bin/c++-${pkgver}
+  mv    ${PKG}/usr/bin/cpp-${pkgver}             ${PKG}/usr/bin/${CHOST}-cpp-${pkgver};
+  rm -f ${PKG}/usr/bin/g++-${pkgver}
+  mv    ${PKG}/usr/bin/gappletviewer-${pkgver}   ${PKG}/usr/bin/${CHOST}-gappletviewer-${pkgver};
+  mv    ${PKG}/usr/bin/gc-analyze-${pkgver}      ${PKG}/usr/bin/${CHOST}-gc-analyze-${pkgver};
+  rm -f ${PKG}/usr/bin/gcc-${pkgver}
+  rm -f ${PKG}/usr/bin/gcc-ar-${pkgver}
+  rm -f ${PKG}/usr/bin/gcc-nm-${pkgver}
+  rm -f ${PKG}/usr/bin/gcc-ranlib-${pkgver}
+  rm -f ${PKG}/usr/bin/gcj-${pkgver}
+  mv    ${PKG}/usr/bin/gcj-dbtool-${pkgver}      ${PKG}/usr/bin/${CHOST}-gcj-dbtool-${pkgver};
+  mv    ${PKG}/usr/bin/gcjh-${pkgver}            ${PKG}/usr/bin/${CHOST}-gcjh-${pkgver};
+  mv    ${PKG}/usr/bin/gcov-${pkgver}            ${PKG}/usr/bin/${CHOST}-gcov-${pkgver};
+  rm -f ${PKG}/usr/bin/gfortran-${pkgver}
+  mv    ${PKG}/usr/bin/gij-${pkgver}             ${PKG}/usr/bin/${CHOST}-gij-${pkgver};
+  mv    ${PKG}/usr/bin/gjar-${pkgver}            ${PKG}/usr/bin/${CHOST}-gjar-${pkgver};
+  mv    ${PKG}/usr/bin/gjarsigner-${pkgver}      ${PKG}/usr/bin/${CHOST}-gjarsigner-${pkgver};
+  mv    ${PKG}/usr/bin/gjavah-${pkgver}          ${PKG}/usr/bin/${CHOST}-gjavah-${pkgver};
+  mv    ${PKG}/usr/bin/gjdoc-${pkgver}           ${PKG}/usr/bin/${CHOST}-gjdoc-${pkgver};
+  mv    ${PKG}/usr/bin/gkeytool-${pkgver}        ${PKG}/usr/bin/${CHOST}-gkeytool-${pkgver};
+  mv    ${PKG}/usr/bin/gnative2ascii-${pkgver}   ${PKG}/usr/bin/${CHOST}-gnative2ascii-${pkgver};
+  mv    ${PKG}/usr/bin/gorbd-${pkgver}           ${PKG}/usr/bin/${CHOST}-gorbd-${pkgver};
+  mv    ${PKG}/usr/bin/grmic-${pkgver}           ${PKG}/usr/bin/${CHOST}-grmic-${pkgver};
+  mv    ${PKG}/usr/bin/grmid-${pkgver}           ${PKG}/usr/bin/${CHOST}-grmid-${pkgver};
+  mv    ${PKG}/usr/bin/grmiregistry-${pkgver}    ${PKG}/usr/bin/${CHOST}-grmiregistry-${pkgver};
+  mv    ${PKG}/usr/bin/gserialver-${pkgver}      ${PKG}/usr/bin/${CHOST}-gserialver-${pkgver};
+  mv    ${PKG}/usr/bin/gtnameserv-${pkgver}      ${PKG}/usr/bin/${CHOST}-gtnameserv-${pkgver};
+  mv    ${PKG}/usr/bin/jcf-dump-${pkgver}        ${PKG}/usr/bin/${CHOST}-jcf-dump-${pkgver};
+  mv    ${PKG}/usr/bin/jv-convert-${pkgver}      ${PKG}/usr/bin/${CHOST}-jv-convert-${pkgver};
+  mv    ${PKG}/usr/bin/rebuild-gcj-db-${pkgver}  ${PKG}/usr/bin/${CHOST}-rebuild-gcj-db-${pkgver};
+
+  ln -sf ${CHOST}-aot-compile-${pkgver}      ${PKG}/usr/bin/aot-compile
+  ln -sf ${CHOST}-c++-${pkgver}              ${PKG}/usr/bin/c++
+  ln -sf ${CHOST}-cpp-${pkgver}              ${PKG}/usr/bin/cpp
+  ln -sf ${CHOST}-g++-${pkgver}              ${PKG}/usr/bin/g++
+  ln -sf ${CHOST}-gappletviewer-${pkgver}    ${PKG}/usr/bin/gappletviewer
+  ln -sf ${CHOST}-gc-analyze-${pkgver}       ${PKG}/usr/bin/gc-analyze
+  ln -sf ${CHOST}-gcc-${pkgver}              ${PKG}/usr/bin/gcc
+  ln -sf ${CHOST}-gcc-ar-${pkgver}           ${PKG}/usr/bin/gcc-ar
+  ln -sf ${CHOST}-gcc-nm-${pkgver}           ${PKG}/usr/bin/gcc-nm
+  ln -sf ${CHOST}-gcc-ranlib-${pkgver}       ${PKG}/usr/bin/gcc-ranlib
+  ln -sf ${CHOST}-gcj-${pkgver}              ${PKG}/usr/bin/gcj
+  ln -sf ${CHOST}-gcj-dbtool-${pkgver}       ${PKG}/usr/bin/gcj-dbtool
+  ln -sf ${CHOST}-gcjh-${pkgver}             ${PKG}/usr/bin/gcjh
+  ln -sf ${CHOST}-gcov-${pkgver}             ${PKG}/usr/bin/gcov
+  ln -sf ${CHOST}-gfortran-${pkgver}         ${PKG}/usr/bin/gfortran
+  ln -sf ${CHOST}-gij-${pkgver}              ${PKG}/usr/bin/gij
+  ln -sf ${CHOST}-gjar-${pkgver}             ${PKG}/usr/bin/gjar
+  ln -sf ${CHOST}-gjarsigner-${pkgver}       ${PKG}/usr/bin/gjarsigner
+  ln -sf ${CHOST}-gjavah-${pkgver}           ${PKG}/usr/bin/gjavah
+  ln -sf ${CHOST}-gjdoc-${pkgver}            ${PKG}/usr/bin/gjdoc
+  ln -sf ${CHOST}-gkeytool-${pkgver}         ${PKG}/usr/bin/gkeytool
+  ln -sf ${CHOST}-gnative2ascii-${pkgver}    ${PKG}/usr/bin/gnative2ascii
+  ln -sf ${CHOST}-gorbd-${pkgver}            ${PKG}/usr/bin/gorbd
+  ln -sf ${CHOST}-grmic-${pkgver}            ${PKG}/usr/bin/grmic
+  ln -sf ${CHOST}-grmid-${pkgver}            ${PKG}/usr/bin/grmid
+  ln -sf ${CHOST}-grmiregistry-${pkgver}     ${PKG}/usr/bin/grmiregistry
+  ln -sf ${CHOST}-gserialver-${pkgver}       ${PKG}/usr/bin/gserialver
+  ln -sf ${CHOST}-gtnameserv-${pkgver}       ${PKG}/usr/bin/gtnameserv
+  ln -sf ${CHOST}-jcf-dump-${pkgver}         ${PKG}/usr/bin/jcf-dump
+  ln -sf ${CHOST}-jv-convert-${pkgver}       ${PKG}/usr/bin/jv-convert
+  ln -sf ${CHOST}-rebuild-gcj-db-${pkgver}   ${PKG}/usr/bin/rebuild-gcj-db
+}
