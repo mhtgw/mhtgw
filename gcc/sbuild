@@ -1,10 +1,16 @@
 pkgname="gcc"
 pkgver="4.8.4"
 source=(https://ftp.gnu.org/gnu/gcc/gcc-$pkgver/gcc-$pkgver.tar.gz
-        gcc-${pkgver}-retpoline-patches.patch
+        gcc-${pkgver}-patch-01-pr65711.patch
+        gcc-${pkgver}-patch-02-escape-braces-in-regexp-involving-strong.patch
+        gcc-${pkgver}-patch-03-use-ucontext_t-not-struct-ucontext-in-linux-unwind-h-files.patch
+        gcc-${pkgver}-patch-04-fix-doc-gcc-texi-for-makeinfo-in-texinfo-6-4.patch
+        gcc-${pkgver}-patch-05-build-gcc-4.8-with-higher-versions.patch
+        gcc-${pkgver}-patch-06-retpoline-patches.patch
         https://sourceware.org/pub/java/ecj-${pkgver:0:3}.jar
         https://repo1.maven.org/maven2/org/antlr/antlr-runtime/3.5.3/antlr-runtime-3.5.3.jar)
 
+# retpoline patches
 #gcc-5.x
 #https://github.com/hjl-tools/gcc/compare/ba9cddfdab8b539b788cd6fe0171351ae43c32da..d525f7d3ea41d13ff50c7c264eb173fb09bd4c3c.patch
 #https://github.com/hjl-tools/gcc/commit/ba9cddfdab8b539b788cd6fe0171351ae43c32da
@@ -24,7 +30,12 @@ build() {
   cp -av $CWD/ecj-${pkgver:0:3}.jar $CWD/gcc-$pkgver/ecj.jar
   cp -av $CWD/antlr-runtime-3.5.3.jar $CWD/gcc-$pkgver/antlr-runtime.jar
 
-  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-retpoline-patches.patch || exit 1
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-patch-01-pr65711.patch || exit 1
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-patch-02-escape-braces-in-regexp-involving-strong.patch || exit 1
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-patch-03-use-ucontext_t-not-struct-ucontext-in-linux-unwind-h-files.patch || exit 1
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-patch-04-fix-doc-gcc-texi-for-makeinfo-in-texinfo-6-4.patch || exit 1
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-patch-05-build-gcc-4.8-with-higher-versions.patch || exit 1
+  patch -p1 -d $CWD/gcc-${pkgver} -i $CWD/gcc-${pkgver}-patch-06-retpoline-patches.patch || exit 1
 
   mkdir gcc-build
   cd gcc-build
@@ -33,7 +44,7 @@ build() {
                 --libdir=/usr/lib${LIBDIRSUFFIX} --libexecdir=/usr/lib${LIBDIRSUFFIX} --includedir=/usr/include --sysconfdir=/etc \
                 --disable-nls --disable-debug --enable-bootstrap --enable-languages=c,c++,fortran,java,objc --enable-threads=posix \
                 --enable-__cxa_atexit --enable-clocale=gnu  --with-system-zlib --disable-multilib \
-                --enable-java-home --with-java-home=/usr/lib64/jvm/jre --with-jvm-root-dir=/usr/lib64/jvm --with-jvm-jar-dir=/usr/lib64/jvm/jvm-exports \
+                --enable-java-home --with-java-home=/usr/lib${LIBDIRSUFFIX}/jvm/jre --with-jvm-root-dir=/usr/lib${LIBDIRSUFFIX}/jvm --with-jvm-jar-dir=/usr/lib${LIBDIRSUFFIX}/jvm/jvm-exports \
                 --with-antlr-jar=$CWD/gcc-$pkgver/antlr-runtime.jar --enable-java-awt=gtk --disable-gtktest --program-suffix=-${pkgver}
   make bootstrap
   make DESTDIR=${PKG} install
@@ -43,11 +54,11 @@ build() {
   #ln -sf gcc ${PKG}/usr/bin/cc
   #ln -sf g++ ${PKG}/usr/bin/c++
   
-  mv -v ${PKG}/usr/lib64/gcc/*/${pkgver}/include-fixed/{limits.h,syslimits.h} ${PKG}/usr/lib64/gcc/*/${pkgver}/include/
+  mv -v ${PKG}/usr/lib${LIBDIRSUFFIX}/gcc/*/${pkgver}/include-fixed/{limits.h,syslimits.h} ${PKG}/usr/lib${LIBDIRSUFFIX}/gcc/*/${pkgver}/include/
   
-  rm -f ${PKG}/usr/lib64/{libiberty.a,libstdc++.so.*-gdb.py}
+  rm -f ${PKG}/usr/lib${LIBDIRSUFFIX}/{libiberty.a,libstdc++.so.*-gdb.py}
   
-  sed -i "s|-L$CWD/gcc-${pkgver}[^ ]* ||g" ${PKG}/usr/lib64/{libstdc++.la,libsupc++.la}
+  sed -i "s|-L$CWD/gcc-${pkgver}[^ ]* ||g" ${PKG}/usr/lib${LIBDIRSUFFIX}/{libstdc++.la,libsupc++.la}
   
   ls -al ${PKG}/usr/bin > $CWD/gcc-$pkgver/.m_old_gcc_binary_files
 

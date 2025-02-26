@@ -1,0 +1,42 @@
+From 9768d7eb98d3b5462e4423f806e241434a90648d Mon Sep 17 00:00:00 2001
+From: ludo <ludo@138bc75d-0d04-0410-961f-82ee72b054a4>
+Date: Tue, 23 Jun 2015 09:16:14 +0000
+Subject: [PATCH 01/18] 	PR 65711 	* config/arm/linux-elf.h
+ (LINUX_TARGET_LINK_SPEC): Move 	'-dynamic-linker' within %{!shared:
+ ...}.
+
+git-svn-id: svn+ssh://gcc.gnu.org/svn/gcc/branches/gcc-4_8-branch@224828 138bc75d-0d04-0410-961f-82ee72b054a4
+---
+ gcc/ChangeLog              | 6 ++++++
+ gcc/config/arm/linux-elf.h | 2 +-
+ 2 files changed, 7 insertions(+), 1 deletion(-)
+
+diff --git a/gcc/ChangeLog b/gcc/ChangeLog
+index a63f624e17a..1c8d1ebf1a6 100644
+--- a/gcc/ChangeLog
++++ b/gcc/ChangeLog
+@@ -1,3 +1,9 @@
++2015-06-23  Ludovic Courtès  <ludo@gnu.org>
++
++	PR 65711
++	* config/arm/linux-elf.h (LINUX_TARGET_LINK_SPEC): Move
++	'-dynamic-linker' within %{!shared: ...}.
++
+ 2014-12-19  Release Manager
+ 
+ 	* GCC 4.8.4 released.
+diff --git a/gcc/config/arm/linux-elf.h b/gcc/config/arm/linux-elf.h
+index 488efa4ba15..81884234489 100644
+--- a/gcc/config/arm/linux-elf.h
++++ b/gcc/config/arm/linux-elf.h
+@@ -65,7 +65,7 @@
+    %{symbolic:-Bsymbolic} \
+    %{!static: \
+      %{rdynamic:-export-dynamic} \
+-     -dynamic-linker " GNU_USER_DYNAMIC_LINKER "} \
++     %{!shared:-dynamic-linker " GNU_USER_DYNAMIC_LINKER "}} \
+    -X \
+    %{mbig-endian:-EB} %{mlittle-endian:-EL}" \
+    SUBTARGET_EXTRA_LINK_SPEC
+
+

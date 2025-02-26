@@ -1,0 +1,27 @@
+From d23207ecd97cdbd286c7ed8d3b5b7a45ebf9ae21 Mon Sep 17 00:00:00 2001
+From: uros <uros@138bc75d-0d04-0410-961f-82ee72b054a4>
+Date: Tue, 4 Aug 2015 16:15:45 +0000
+Subject: [PATCH 02/18] Escape braces in regexp involving @strong{...}
+
+	* texi2pod.pl: Escape braces in regexp involving @strong{...}.
+
+git-svn-id: svn+ssh://gcc.gnu.org/svn/gcc/trunk@226585 138bc75d-0d04-0410-961f-82ee72b054a4
+---
+ contrib/texi2pod.pl | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/contrib/texi2pod.pl b/contrib/texi2pod.pl
+index 5a4bbacdf5e..cce12901623 100755
+--- a/contrib/texi2pod.pl
++++ b/contrib/texi2pod.pl
+@@ -316,7 +316,7 @@
+ 	@columns = ();
+ 	for $column (split (/\s*\@tab\s*/, $1)) {
+ 	    # @strong{...} is used a @headitem work-alike
+-	    $column =~ s/^\@strong{(.*)}$/$1/;
++	    $column =~ s/^\@strong\{(.*)\}$/$1/;
+ 	    push @columns, $column;
+ 	}
+ 	$_ = "\n=item ".join (" : ", @columns)."\n";
+
+
