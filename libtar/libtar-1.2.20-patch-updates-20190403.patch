@@ -1,0 +1,1271 @@
+https://github.com/tklauser/libtar/compare/0907a9034eaf2a57e8e4a9439f793f3f05d446cd..6379b5d2ae777dad576aeae70566740670057821.patch
+
+From 8128ad8c79321782a7238a8ea7ffede41136a419 Mon Sep 17 00:00:00 2001
+From: Chris Frey <cdfrey@foursquare.net>
+Date: Thu, 10 Oct 2013 19:55:06 -0400
+Subject: [PATCH 01/24] Added commentary on T_BLOCKSIZE, ssize_t, and int size
+ risks
+
+Thanks to Chris Palmer.
+---
+ lib/block.c  | 11 +++++++++++
+ lib/libtar.h |  1 +
+ 2 files changed, 12 insertions(+)
+
+diff --git a/lib/block.c b/lib/block.c
+index 092bc28..30a8387 100644
+--- a/lib/block.c
++++ b/lib/block.c
+@@ -24,6 +24,17 @@
+ 
+ 
+ /* read a header block */
++/* FIXME: the return value of this function should match the return value
++	  of tar_block_read(), which is a macro which references a prototype
++	  that returns a ssize_t.  So far, this is safe, since tar_block_read()
++	  only ever reads 512 (T_BLOCKSIZE) bytes at a time, so any difference
++	  in size of ssize_t and int is of negligible risk.  BUT, if
++	  T_BLOCKSIZE ever changes, or ever becomes a variable parameter
++	  controllable by the user, all the code that calls it,
++	  including this function and all code that calls it, should be
++	  fixed for security reasons.
++	  Thanks to Chris Palmer for the critique.
++*/
+ int
+ th_read_internal(TAR *t)
+ {
+diff --git a/lib/libtar.h b/lib/libtar.h
+index 55f509a..3b46a13 100644
+--- a/lib/libtar.h
++++ b/lib/libtar.h
+@@ -26,6 +26,7 @@ extern "C"
+ 
+ 
+ /* useful constants */
++/* see FIXME note in block.c regarding T_BLOCKSIZE */
+ #define T_BLOCKSIZE		512
+ #define T_NAMELEN		100
+ #define T_PREFIXLEN		155
+
+From 30e5556d1c9323e9f1887b28d42581c2954b53c9 Mon Sep 17 00:00:00 2001
+From: Hans de Goede <j.w.r.degoede@hhs.nl>
+Date: Tue, 15 Oct 2013 14:39:04 +0200
+Subject: [PATCH 02/24] Fix missing prototype compiler warnings
+
+Signed-off-by: Kamil Dudka <kdudka@redhat.com>
+---
+ lib/append.c  | 2 ++
+ lib/output.c  | 1 +
+ lib/wrapper.c | 1 +
+ 3 files changed, 4 insertions(+)
+
+diff --git a/lib/append.c b/lib/append.c
+index 13e1ace..e8bd89d 100644
+--- a/lib/append.c
++++ b/lib/append.c
+@@ -13,6 +13,8 @@
+ #include <internal.h>
+ 
+ #include <stdio.h>
++#include <stdlib.h>
++#include <string.h>
+ #include <errno.h>
+ #include <fcntl.h>
+ #include <sys/param.h>
+diff --git a/lib/output.c b/lib/output.c
+index a2db929..a5262ee 100644
+--- a/lib/output.c
++++ b/lib/output.c
+@@ -13,6 +13,7 @@
+ #include <internal.h>
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <pwd.h>
+ #include <grp.h>
+ #include <time.h>
+diff --git a/lib/wrapper.c b/lib/wrapper.c
+index 4cd0652..44cc435 100644
+--- a/lib/wrapper.c
++++ b/lib/wrapper.c
+@@ -13,6 +13,7 @@
+ #include <internal.h>
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <sys/param.h>
+ #include <dirent.h>
+ #include <errno.h>
+
+From 560911b694055b0c677431cf85d4d0d5ebd1a3fd Mon Sep 17 00:00:00 2001
+From: Huzaifa Sidhpurwala <huzaifas@fedoraproject.org>
+Date: Tue, 15 Oct 2013 14:39:05 +0200
+Subject: [PATCH 03/24] Fix invalid memory de-reference issue
+
+Bug: https://bugzilla.redhat.com/551415
+
+Signed-off-by: Kamil Dudka <kdudka@redhat.com>
+---
+ lib/libtar.h | 1 +
+ lib/util.c   | 4 +---
+ 2 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/lib/libtar.h b/lib/libtar.h
+index 3b46a13..616ca8f 100644
+--- a/lib/libtar.h
++++ b/lib/libtar.h
+@@ -173,6 +173,7 @@ int th_write(TAR *t);
+ #define TH_ISDIR(t)	((t)->th_buf.typeflag == DIRTYPE \
+ 			 || S_ISDIR((mode_t)oct_to_int((t)->th_buf.mode)) \
+ 			 || ((t)->th_buf.typeflag == AREGTYPE \
++			     && strlen((t)->th_buf.name) \
+ 			     && ((t)->th_buf.name[strlen((t)->th_buf.name) - 1] == '/')))
+ #define TH_ISFIFO(t)	((t)->th_buf.typeflag == FIFOTYPE \
+ 			 || S_ISFIFO((mode_t)oct_to_int((t)->th_buf.mode)))
+diff --git a/lib/util.c b/lib/util.c
+index 31e8315..11438ef 100644
+--- a/lib/util.c
++++ b/lib/util.c
+@@ -148,9 +148,7 @@ oct_to_int(char *oct)
+ {
+ 	int i;
+ 
+-	sscanf(oct, "%o", &i);
+-
+-	return i;
++	return sscanf(oct, "%o", &i) == 1 ? i : 0;
+ }
+ 
+ 
+
+From abd0274e6b2f708e9eaa29414b07b3f542cec694 Mon Sep 17 00:00:00 2001
+From: Kamil Dudka <kdudka@redhat.com>
+Date: Tue, 15 Oct 2013 19:48:41 -0400
+Subject: [PATCH 04/24] fix file descriptor leaks reported by cppcheck
+
+Bug: https://bugzilla.redhat.com/785760
+---
+ lib/append.c    | 14 +++++++++-----
+ lib/extract.c   |  4 ++++
+ libtar/libtar.c |  3 +++
+ 3 files changed, 16 insertions(+), 5 deletions(-)
+
+diff --git a/lib/append.c b/lib/append.c
+index e8bd89d..ff58532 100644
+--- a/lib/append.c
++++ b/lib/append.c
+@@ -216,6 +216,7 @@ tar_append_regfile(TAR *t, const char *realname)
+ 	int filefd;
+ 	int i, j;
+ 	size_t size;
++	int rv = -1;
+ 
+ 	filefd = open(realname, O_RDONLY);
+ 	if (filefd == -1)
+@@ -234,25 +235,28 @@ tar_append_regfile(TAR *t, const char *realname)
+ 		{
+ 			if (j != -1)
+ 				errno = EINVAL;
+-			return -1;
++			goto fail;
+ 		}
+ 		if (tar_block_write(t, &block) == -1)
+-			return -1;
++			goto fail;
+ 	}
+ 
+ 	if (i > 0)
+ 	{
+ 		j = read(filefd, &block, i);
+ 		if (j == -1)
+-			return -1;
++			goto fail;
+ 		memset(&(block[i]), 0, T_BLOCKSIZE - i);
+ 		if (tar_block_write(t, &block) == -1)
+-			return -1;
++			goto fail;
+ 	}
+ 
++	/* success! */
++	rv = 0;
++fail:
+ 	close(filefd);
+ 
+-	return 0;
++	return rv;
+ }
+ 
+ 
+diff --git a/lib/extract.c b/lib/extract.c
+index 36357e7..9fc6ad5 100644
+--- a/lib/extract.c
++++ b/lib/extract.c
+@@ -228,13 +228,17 @@ tar_extract_regfile(TAR *t, char *realname)
+ 		{
+ 			if (k != -1)
+ 				errno = EINVAL;
++			close(fdout);
+ 			return -1;
+ 		}
+ 
+ 		/* write block to output file */
+ 		if (write(fdout, buf,
+ 			  ((i > T_BLOCKSIZE) ? T_BLOCKSIZE : i)) == -1)
++		{
++			close(fdout);
+ 			return -1;
++		}
+ 	}
+ 
+ 	/* close output file */
+diff --git a/libtar/libtar.c b/libtar/libtar.c
+index 9fa92b2..bb5644c 100644
+--- a/libtar/libtar.c
++++ b/libtar/libtar.c
+@@ -83,7 +83,10 @@ gzopen_frontend(char *pathname, int oflags, int mode)
+ 		return -1;
+ 
+ 	if ((oflags & O_CREAT) && fchmod(fd, mode))
++	{
++		close(fd);
+ 		return -1;
++	}
+ 
+ 	gzf = gzdopen(fd, gzoflags);
+ 	if (!gzf)
+
+From 36629a41208375f5105427e98078127551692028 Mon Sep 17 00:00:00 2001
+From: Huzaifa Sidhpurwala <huzaifas@fedoraproject.org>
+Date: Tue, 15 Oct 2013 20:02:58 -0400
+Subject: [PATCH 05/24] fix memleak on tar_open() failure
+
+---
+ lib/handle.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lib/handle.c b/lib/handle.c
+index 33a262c..002d23c 100644
+--- a/lib/handle.c
++++ b/lib/handle.c
+@@ -82,6 +82,7 @@ tar_open(TAR **t, const char *pathname, tartype_t *type,
+ 	(*t)->fd = (*((*t)->type->openfunc))(pathname, oflags, mode);
+ 	if ((*t)->fd == -1)
+ 	{
++		libtar_hash_free((*t)->h, NULL);
+ 		free(*t);
+ 		return -1;
+ 	}
+
+From f3c711cf3054ff366a1a3500cdc8c64ecc2d2da6 Mon Sep 17 00:00:00 2001
+From: Huzaifa Sidhpurwala <huzaifas@fedoraproject.org>
+Date: Tue, 15 Oct 2013 20:05:04 -0400
+Subject: [PATCH 06/24] fix memleaks in libtar sample program
+
+---
+ libtar/libtar.c | 29 ++++++++++++++++++-----------
+ 1 file changed, 18 insertions(+), 11 deletions(-)
+
+diff --git a/libtar/libtar.c b/libtar/libtar.c
+index bb5644c..23f8741 100644
+--- a/libtar/libtar.c
++++ b/libtar/libtar.c
+@@ -253,6 +253,7 @@ extract(char *tarfile, char *rootdir)
+ 	if (tar_extract_all(t, rootdir) != 0)
+ 	{
+ 		fprintf(stderr, "tar_extract_all(): %s\n", strerror(errno));
++		tar_close(t);
+ 		return -1;
+ 	}
+ 
+@@ -270,12 +271,13 @@ extract(char *tarfile, char *rootdir)
+ 
+ 
+ void
+-usage()
++usage(void *rootdir)
+ {
+ 	printf("Usage: %s [-C rootdir] [-g] [-z] -x|-t filename.tar\n",
+ 	       progname);
+ 	printf("       %s [-C rootdir] [-g] [-z] -c filename.tar ...\n",
+ 	       progname);
++	free(rootdir);
+ 	exit(-1);
+ }
+ 
+@@ -292,6 +294,7 @@ main(int argc, char *argv[])
+ 	int c;
+ 	int mode = 0;
+ 	libtar_list_t *l;
++	int return_code = -2;
+ 
+ 	progname = basename(argv[0]);
+ 
+@@ -313,17 +316,17 @@ main(int argc, char *argv[])
+ 			break;
+ 		case 'c':
+ 			if (mode)
+-				usage();
++				usage(rootdir);
+ 			mode = MODE_CREATE;
+ 			break;
+ 		case 'x':
+ 			if (mode)
+-				usage();
++				usage(rootdir);
+ 			mode = MODE_EXTRACT;
+ 			break;
+ 		case 't':
+ 			if (mode)
+-				usage();
++				usage(rootdir);
+ 			mode = MODE_LIST;
+ 			break;
+ #ifdef HAVE_LIBZ
+@@ -332,7 +335,7 @@ main(int argc, char *argv[])
+ 			break;
+ #endif /* HAVE_LIBZ */
+ 		default:
+-			usage();
++			usage(rootdir);
+ 		}
+ 
+ 	if (!mode || ((argc - optind) < (mode == MODE_CREATE ? 2 : 1)))
+@@ -341,7 +344,7 @@ main(int argc, char *argv[])
+ 		printf("argc - optind == %d\tmode == %d\n", argc - optind,
+ 		       mode);
+ #endif
+-		usage();
++		usage(rootdir);
+ 	}
+ 
+ #ifdef DEBUG
+@@ -351,21 +354,25 @@ main(int argc, char *argv[])
+ 	switch (mode)
+ 	{
+ 	case MODE_EXTRACT:
+-		return extract(argv[optind], rootdir);
++		return_code = extract(argv[optind], rootdir);
++		break;
+ 	case MODE_CREATE:
+ 		tarfile = argv[optind];
+ 		l = libtar_list_new(LIST_QUEUE, NULL);
+ 		for (c = optind + 1; c < argc; c++)
+ 			libtar_list_add(l, argv[c]);
+-		return create(tarfile, rootdir, l);
++		return_code = create(tarfile, rootdir, l);
++		libtar_list_free(l, NULL);
++		break;
+ 	case MODE_LIST:
+-		return list(argv[optind]);
++		return_code = list(argv[optind]);
++		break;
+ 	default:
+ 		break;
+ 	}
+ 
+-	/* NOTREACHED */
+-	return -2;
++	free(rootdir);
++	return return_code;
+ }
+ 
+ 
+
+From ec613af2e9371d7a3e1f7c7a6822164a4255b4d1 Mon Sep 17 00:00:00 2001
+From: Kamil Dudka <kdudka@redhat.com>
+Date: Wed, 23 Oct 2013 15:04:22 +0200
+Subject: [PATCH 07/24] decode: avoid using a static buffer in
+ th_get_pathname()
+
+A solution suggested by Chris Frey:
+https://lists.feep.net:8080/pipermail/libtar/2013-October/000377.html
+
+Note this can break programs that expect sizeof(TAR) to be fixed.
+---
+ lib/decode.c | 24 +++++++++++++++++-------
+ lib/handle.c |  1 +
+ lib/libtar.h |  3 +++
+ 3 files changed, 21 insertions(+), 7 deletions(-)
+
+diff --git a/lib/decode.c b/lib/decode.c
+index c16ea2d..edb2185 100644
+--- a/lib/decode.c
++++ b/lib/decode.c
+@@ -26,20 +26,30 @@
+ char *
+ th_get_pathname(TAR *t)
+ {
+-	static TLS_THREAD char filename[MAXPATHLEN];
+-
+ 	if (t->th_buf.gnu_longname)
+ 		return t->th_buf.gnu_longname;
+ 
+-	if (t->th_buf.prefix[0] != '\0')
++	/* allocate the th_pathname buffer if not already */
++	if (t->th_pathname == NULL)
++	{
++		t->th_pathname = malloc(MAXPATHLEN * sizeof(char));
++		if (t->th_pathname == NULL)
++			/* out of memory */
++			return NULL;
++	}
++
++	if (t->th_buf.prefix[0] == '\0')
++	{
++		snprintf(t->th_pathname, MAXPATHLEN, "%.100s", t->th_buf.name);
++	}
++	else
+ 	{
+-		snprintf(filename, sizeof(filename), "%.155s/%.100s",
++		snprintf(t->th_pathname, MAXPATHLEN, "%.155s/%.100s",
+ 			 t->th_buf.prefix, t->th_buf.name);
+-		return filename;
+ 	}
+ 
+-	snprintf(filename, sizeof(filename), "%.100s", t->th_buf.name);
+-	return filename;
++	/* will be deallocated in tar_close() */
++	return t->th_pathname;
+ }
+ 
+ 
+diff --git a/lib/handle.c b/lib/handle.c
+index 002d23c..a19c046 100644
+--- a/lib/handle.c
++++ b/lib/handle.c
+@@ -122,6 +122,7 @@ tar_close(TAR *t)
+ 		libtar_hash_free(t->h, ((t->oflags & O_ACCMODE) == O_RDONLY
+ 					? free
+ 					: (libtar_freefunc_t)tar_dev_free));
++	free(t->th_pathname);
+ 	free(t);
+ 
+ 	return i;
+diff --git a/lib/libtar.h b/lib/libtar.h
+index 616ca8f..2fefee0 100644
+--- a/lib/libtar.h
++++ b/lib/libtar.h
+@@ -86,6 +86,9 @@ typedef struct
+ 	int options;
+ 	struct tar_header th_buf;
+ 	libtar_hash_t *h;
++
++	/* introduced in libtar 1.2.21 */
++	char *th_pathname;
+ }
+ TAR;
+ 
+
+From 495d0c0eabc5648186e7d58ad54b508d14af38f4 Mon Sep 17 00:00:00 2001
+From: Chris Frey <cdfrey@foursquare.net>
+Date: Thu, 24 Oct 2013 17:55:12 -0400
+Subject: [PATCH 08/24] Check for NULL before freeing th_pathname
+
+Thanks to Harald Koch for pointing out that AIX 4 and 5 still need this.
+---
+ lib/handle.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/lib/handle.c b/lib/handle.c
+index a19c046..28a7dc2 100644
+--- a/lib/handle.c
++++ b/lib/handle.c
+@@ -122,7 +122,8 @@ tar_close(TAR *t)
+ 		libtar_hash_free(t->h, ((t->oflags & O_ACCMODE) == O_RDONLY
+ 					? free
+ 					: (libtar_freefunc_t)tar_dev_free));
+-	free(t->th_pathname);
++	if (t->th_pathname != NULL)
++		free(t->th_pathname);
+ 	free(t);
+ 
+ 	return i;
+
+From 20aa09bd7775094a2beb0f136c2c7d9e9fd6c7e6 Mon Sep 17 00:00:00 2001
+From: Chris Frey <cdfrey@foursquare.net>
+Date: Thu, 24 Oct 2013 17:58:47 -0400
+Subject: [PATCH 09/24] Added stdlib.h for malloc() in lib/decode.c
+
+---
+ lib/decode.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lib/decode.c b/lib/decode.c
+index edb2185..35312be 100644
+--- a/lib/decode.c
++++ b/lib/decode.c
+@@ -13,6 +13,7 @@
+ #include <internal.h>
+ 
+ #include <stdio.h>
++#include <stdlib.h>
+ #include <sys/param.h>
+ #include <pwd.h>
+ #include <grp.h>
+
+From 7c3b3453bf81a424a1fa9659c81977cb091f3296 Mon Sep 17 00:00:00 2001
+From: Kamil Dudka <kdudka@redhat.com>
+Date: Fri, 25 Oct 2013 13:49:58 +0200
+Subject: [PATCH 10/24] .gitignore: ignore binaries and generated files
+
+---
+ .gitignore          | 15 +++++++++++++++
+ autoconf/.gitignore | 10 ++++++++++
+ lib/.gitignore      |  1 +
+ libtar/.gitignore   |  1 +
+ listhash/.gitignore |  5 +++++
+ 5 files changed, 32 insertions(+)
+ create mode 100644 .gitignore
+ create mode 100644 autoconf/.gitignore
+ create mode 100644 lib/.gitignore
+ create mode 100644 libtar/.gitignore
+ create mode 100644 listhash/.gitignore
+
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..45937bb
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,15 @@
++*.o
++*.lo
++.libs/
++Makefile
++/INSTALL
++/Makefile.in
++/aclocal.m4
++/autom4te.cache/
++/configure
++/config.h
++/config.h.in
++/config.log
++/config.status
++/libtool
++/stamp-h1
+diff --git a/autoconf/.gitignore b/autoconf/.gitignore
+new file mode 100644
+index 0000000..c679c57
+--- /dev/null
++++ b/autoconf/.gitignore
+@@ -0,0 +1,10 @@
++/config.guess
++/config.sub
++/install-sh
++/libtool.m4
++/ltmain.sh
++/ltoptions.m4
++/ltsugar.m4
++/ltversion.m4
++/lt~obsolete.m4
++/missing
+diff --git a/lib/.gitignore b/lib/.gitignore
+new file mode 100644
+index 0000000..09fa1fd
+--- /dev/null
++++ b/lib/.gitignore
+@@ -0,0 +1 @@
++/libtar.la
+diff --git a/libtar/.gitignore b/libtar/.gitignore
+new file mode 100644
+index 0000000..e4182a7
+--- /dev/null
++++ b/libtar/.gitignore
+@@ -0,0 +1 @@
++/libtar
+diff --git a/listhash/.gitignore b/listhash/.gitignore
+new file mode 100644
+index 0000000..a5097ad
+--- /dev/null
++++ b/listhash/.gitignore
+@@ -0,0 +1,5 @@
++/libtar_hash.c
++/libtar_hash_new.3
++/libtar_list.c
++/libtar_list_new.3
++/libtar_listhash.h
+
+From e4c1f2974258d6a325622cfd712873d49b5e7a73 Mon Sep 17 00:00:00 2001
+From: Chris Frey <cdfrey@foursquare.net>
+Date: Thu, 24 Oct 2013 18:52:44 -0400
+Subject: [PATCH 11/24] Change th_get_size() macro to return unsigned int
+
+On systems where size_t is larger than an int (and larger than
+unsigned int), then in various places in the library, where
+stuff like this happens:
+
+	size_t sz = th_get_size(t);
+
+then the int value returned from th_get_size() is sign extended to
+some unwieldy amount.
+
+On 64bit systems, this can yield extremely large values.
+
+By fixing this problem in the header, and only for th_get_size(),
+we avoid breaking the API of the function call oct_to_int()
+(which arguably should return an unsigned int, since the sscanf()
+it uses expects to yield an unsigned int).  We also fix the library,
+which uses th_get_size() internally to assign sizes to size_t.
+
+The drawback is that not all client code that uses th_get_size()
+will be fixed, until they recompile, but they will automatically
+take advantage of the bugs fixed *inside* the library.
+
+The remaining th_get_*() functions operate on modes and CRC values
+and the like, and should be fine, remaining as ints.
+
+Thanks very much to Magnus Holmgren for catching this behaviour.
+https://lists.feep.net:8080/pipermail/libtar/2013-October/000365.html
+---
+ lib/libtar.h | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/lib/libtar.h b/lib/libtar.h
+index 2fefee0..13bb82d 100644
+--- a/lib/libtar.h
++++ b/lib/libtar.h
+@@ -185,7 +185,11 @@ int th_write(TAR *t);
+ 
+ /* decode tar header info */
+ #define th_get_crc(t) oct_to_int((t)->th_buf.chksum)
+-#define th_get_size(t) oct_to_int((t)->th_buf.size)
++/* We cast from int (what oct_to_int() returns) to
++   unsigned int, to avoid unwieldy sign extensions
++   from occurring on systems where size_t is bigger than int,
++   since th_get_size() is often stored into a size_t. */
++#define th_get_size(t) ((unsigned int)oct_to_int((t)->th_buf.size))
+ #define th_get_mtime(t) oct_to_int((t)->th_buf.mtime)
+ #define th_get_devmajor(t) oct_to_int((t)->th_buf.devmajor)
+ #define th_get_devminor(t) oct_to_int((t)->th_buf.devminor)
+
+From aa263f13f3238ce3b0023daad8194df4a513816e Mon Sep 17 00:00:00 2001
+From: Ron Yorston <rmy@tigress.co.uk>
+Date: Wed, 13 Nov 2013 10:06:47 +0000
+Subject: [PATCH 12/24] Open files in binary mode on systems that have O_BINARY
+
+There are three places in the library where files are opened.  In two
+of those places the flag O_BINARY is included if defined.  This patch
+does the same in the third.
+
+I noticed this because I've been using (a hacked version of) the library
+cross-compiled with MinGW on WIN32.  I expect Cygwin would also be
+affected.
+
+Ron
+---
+ lib/append.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/lib/append.c b/lib/append.c
+index ff58532..32622f3 100644
+--- a/lib/append.c
++++ b/lib/append.c
+@@ -218,7 +218,11 @@ tar_append_regfile(TAR *t, const char *realname)
+ 	size_t size;
+ 	int rv = -1;
+ 
++#if defined(O_BINARY)
++	filefd = open(realname, O_RDONLY|O_BINARY);
++#else
+ 	filefd = open(realname, O_RDONLY);
++#endif
+ 	if (filefd == -1)
+ 	{
+ #ifdef DEBUG
+
+From 6d0ab4c78e7a8305c36a0c3d63fd25cd1493de65 Mon Sep 17 00:00:00 2001
+From: Tim Band <t.b@n.w>
+Date: Tue, 3 Dec 2013 14:31:11 +0000
+Subject: [PATCH 13/24] Added autoconf instructions to README
+
+---
+ README | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/README b/README
+index 563c868..39f448c 100644
+--- a/README
++++ b/README
+@@ -13,8 +13,10 @@ Here are some of its features:
+ Installation
+ ------------
+ 
+-To build libtar, you should be able to simply run these commands:
++To build libtar, ensure that autoconf and libtool are both installed on
++your system, then run these commands:
+ 
++   autoreconf --force --install
+    ./configure
+    make
+    make install
+
+From 64f9997665c266e49b568feff1b05342525d158d Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Tue, 9 Dec 2014 14:37:08 +0100
+Subject: [PATCH 14/24] Fix printf format compiler warning
+
+The printf field width specifier '*' expects an int argument, so cast it
+accordingly. This fixes the following compiler warning:
+
+util.c: In function 'int_to_oct_nonull':
+util.c:159:2: warning: field width specifier '*' expects argument of type 'int', but argument 4 has type 'size_t' [-Wformat]
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/util.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/util.c b/lib/util.c
+index 11438ef..37e730b 100644
+--- a/lib/util.c
++++ b/lib/util.c
+@@ -156,7 +156,7 @@ oct_to_int(char *oct)
+ void
+ int_to_oct_nonull(int num, char *oct, size_t octlen)
+ {
+-	snprintf(oct, octlen, "%*lo", octlen - 1, (unsigned long)num);
++	snprintf(oct, octlen, "%*lo", (int)(octlen - 1), (unsigned long)num);
+ 	oct[octlen - 1] = ' ';
+ }
+ 
+
+From 8270b7351565202edb1c389b711c0741e14d6e6e Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Tue, 9 Dec 2014 14:41:46 +0100
+Subject: [PATCH 15/24] Add const qualifier to pathname member of TAR
+
+The pathname member is only set onnce in tar init from a const char*, so
+it can be const char* as well. This fixes the following compiler
+warning:
+
+handle.c: In function 'tar_init':
+handle.c:47:17: warning: assignment discards 'const' qualifier from pointer target type [enabled by default]
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/libtar.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/libtar.h b/lib/libtar.h
+index 13bb82d..cb60530 100644
+--- a/lib/libtar.h
++++ b/lib/libtar.h
+@@ -80,7 +80,7 @@ tartype_t;
+ typedef struct
+ {
+ 	tartype_t *type;
+-	char *pathname;
++	const char *pathname;
+ 	long fd;
+ 	int oflags;
+ 	int options;
+
+From dcac6905ab8eb251edd1308770c46783de88667a Mon Sep 17 00:00:00 2001
+From: Raphael Geissert <geissert@debian.org>
+Date: Tue, 9 Dec 2014 15:02:15 +0100
+Subject: [PATCH 16/24] Avoid directory traversal when extracting archives
+
+Avoid directory traversal when extracting archives by skipping over leading
+slashes and any prefix containing ".." components.
+
+Patch authored by Raphael Geissert.
+
+Source: http://sources.debian.net/data/main/libt/libtar/1.2.20-4/debian/patches/CVE-2013-4420.patch
+Reference: https://bugs.debian.org/73186
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/decode.c   | 33 +++++++++++++++++++++++++++++++--
+ lib/extract.c  |  8 ++++----
+ lib/internal.h |  1 +
+ lib/output.c   |  4 ++--
+ 4 files changed, 38 insertions(+), 8 deletions(-)
+
+diff --git a/lib/decode.c b/lib/decode.c
+index 35312be..edd5f2e 100644
+--- a/lib/decode.c
++++ b/lib/decode.c
+@@ -22,13 +22,42 @@
+ # include <string.h>
+ #endif
+ 
++char *
++safer_name_suffix (char const *file_name)
++{
++	char const *p, *t;
++	p = t = file_name;
++	while (*p == '/') t = ++p;
++	while (*p)
++	{
++		while (p[0] == '.' && p[0] == p[1] && p[2] == '/')
++		{
++			p += 3;
++			t = p;
++		}
++		/* advance pointer past the next slash */
++		while (*p && (p++)[0] != '/');
++	}
++
++	if (!*t)
++	{
++		t = ".";
++	}
++
++	if (t != file_name)
++	{
++		/* TODO: warn somehow that the path was modified */
++	}
++	return (char*)t;
++}
++
+ 
+ /* determine full path name */
+ char *
+ th_get_pathname(TAR *t)
+ {
+ 	if (t->th_buf.gnu_longname)
+-		return t->th_buf.gnu_longname;
++		return safer_name_suffix(t->th_buf.gnu_longname);
+ 
+ 	/* allocate the th_pathname buffer if not already */
+ 	if (t->th_pathname == NULL)
+@@ -50,7 +79,7 @@ th_get_pathname(TAR *t)
+ 	}
+ 
+ 	/* will be deallocated in tar_close() */
+-	return t->th_pathname;
++	return safer_name_suffix(t->th_pathname);
+ }
+ 
+ 
+diff --git a/lib/extract.c b/lib/extract.c
+index 9fc6ad5..4ff1a95 100644
+--- a/lib/extract.c
++++ b/lib/extract.c
+@@ -302,14 +302,14 @@ tar_extract_hardlink(TAR * t, char *realname)
+ 	if (mkdirhier(dirname(filename)) == -1)
+ 		return -1;
+ 	libtar_hashptr_reset(&hp);
+-	if (libtar_hash_getkey(t->h, &hp, th_get_linkname(t),
++	if (libtar_hash_getkey(t->h, &hp, safer_name_suffix(th_get_linkname(t)),
+ 			       (libtar_matchfunc_t)libtar_str_match) != 0)
+ 	{
+ 		lnp = (char *)libtar_hashptr_data(&hp);
+ 		linktgt = &lnp[strlen(lnp) + 1];
+ 	}
+ 	else
+-		linktgt = th_get_linkname(t);
++		linktgt = safer_name_suffix(th_get_linkname(t));
+ 
+ #ifdef DEBUG
+ 	printf("  ==> extracting: %s (link to %s)\n", filename, linktgt);
+@@ -347,9 +347,9 @@ tar_extract_symlink(TAR *t, char *realname)
+ 
+ #ifdef DEBUG
+ 	printf("  ==> extracting: %s (symlink to %s)\n",
+-	       filename, th_get_linkname(t));
++	       filename, safer_name_suffix(th_get_linkname(t)));
+ #endif
+-	if (symlink(th_get_linkname(t), filename) == -1)
++	if (symlink(safer_name_suffix(th_get_linkname(t)), filename) == -1)
+ 	{
+ #ifdef DEBUG
+ 		perror("symlink()");
+diff --git a/lib/internal.h b/lib/internal.h
+index da7be7f..f05ca4f 100644
+--- a/lib/internal.h
++++ b/lib/internal.h
+@@ -21,3 +21,4 @@
+ #define TLS_THREAD
+ #endif
+ 
++char* safer_name_suffix(char const*);
+diff --git a/lib/output.c b/lib/output.c
+index a5262ee..af754f1 100644
+--- a/lib/output.c
++++ b/lib/output.c
+@@ -124,9 +124,9 @@ th_print_long_ls(TAR *t)
+ 		else
+ 			printf(" link to ");
+ 		if ((t->options & TAR_GNU) && t->th_buf.gnu_longlink != NULL)
+-			printf("%s", t->th_buf.gnu_longlink);
++			printf("%s", safer_name_suffix(t->th_buf.gnu_longlink));
+ 		else
+-			printf("%.100s", t->th_buf.linkname);
++			printf("%.100s", safer_name_suffix(t->th_buf.linkname));
+ 	}
+ 
+ 	putchar('\n');
+
+From 49d0c04c678110906eaeba812afa0a29353db3f4 Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Tue, 9 Dec 2014 16:47:09 +0100
+Subject: [PATCH 17/24] Add include guard to internal.h
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/internal.h | 5 +++++
+ 1 file changed, 5 insertions(+)
+
+diff --git a/lib/internal.h b/lib/internal.h
+index f05ca4f..da5bb60 100644
+--- a/lib/internal.h
++++ b/lib/internal.h
+@@ -10,6 +10,9 @@
+ **  University of Illinois at Urbana-Champaign
+ */
+ 
++#ifndef INTERNAL_H
++#define INTERNAL_H
++
+ #include <config.h>
+ #include <compat.h>
+ 
+@@ -22,3 +25,5 @@
+ #endif
+ 
+ char* safer_name_suffix(char const*);
++
++#endif
+
+From f60f7d5392872544c366df4977fd875571cb978f Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Mon, 19 Jan 2015 09:52:17 +0100
+Subject: [PATCH 18/24] Check calloc() return value
+
+calloc() might return NULL in OOM conditions, properly handle this case
+and prevent a NULL pointer dereference.
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/append.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/lib/append.c b/lib/append.c
+index 32622f3..c6ec641 100644
+--- a/lib/append.c
++++ b/lib/append.c
+@@ -107,6 +107,8 @@ tar_append_file(TAR *t, const char *realname, const char *savename)
+ 		       major(s.st_dev), minor(s.st_dev));
+ #endif
+ 		td = (tar_dev_t *)calloc(1, sizeof(tar_dev_t));
++		if (td == NULL)
++			return -1;
+ 		td->td_dev = s.st_dev;
+ 		td->td_h = libtar_hash_new(256, (libtar_hashfunc_t)ino_hash);
+ 		if (td->td_h == NULL)
+
+From c4c49f752b78027ba7fabbc94079631c4e475022 Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Mon, 19 Jan 2015 09:55:15 +0100
+Subject: [PATCH 19/24] Prevent memory leak in error case
+
+td was previously allocated and will be leaked if libtar_hash_new fails.
+
+Found by the Coverity Scanner CID 10580.
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/append.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/lib/append.c b/lib/append.c
+index c6ec641..00c9aef 100644
+--- a/lib/append.c
++++ b/lib/append.c
+@@ -111,8 +111,10 @@ tar_append_file(TAR *t, const char *realname, const char *savename)
+ 			return -1;
+ 		td->td_dev = s.st_dev;
+ 		td->td_h = libtar_hash_new(256, (libtar_hashfunc_t)ino_hash);
+-		if (td->td_h == NULL)
++		if (td->td_h == NULL) {
++			free(td);
+ 			return -1;
++		}
+ 		if (libtar_hash_add(t->h, td) == -1)
+ 			return -1;
+ 	}
+
+From 0ccac015e75936a52210e88ff4e40ac8aa5f6a1a Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Mon, 19 Jan 2015 10:57:47 +0100
+Subject: [PATCH 20/24] Fix directory stream resource leak
+
+Prevent dp from leaking in the error cases.
+
+Found by the Coverity Scanner CID 10581.
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/wrapper.c | 13 ++++++++-----
+ 1 file changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/lib/wrapper.c b/lib/wrapper.c
+index 44cc435..eee3934 100644
+--- a/lib/wrapper.c
++++ b/lib/wrapper.c
+@@ -92,6 +92,7 @@ tar_extract_all(TAR *t, char *prefix)
+ int
+ tar_append_tree(TAR *t, char *realdir, char *savedir)
+ {
++	int ret = -1;
+ 	char realpath[MAXPATHLEN];
+ 	char savepath[MAXPATHLEN];
+ 	struct dirent *dent;
+@@ -130,24 +131,26 @@ tar_append_tree(TAR *t, char *realdir, char *savedir)
+ 				 dent->d_name);
+ 
+ 		if (lstat(realpath, &s) != 0)
+-			return -1;
++			goto out;
+ 
+ 		if (S_ISDIR(s.st_mode))
+ 		{
+ 			if (tar_append_tree(t, realpath,
+ 					    (savedir ? savepath : NULL)) != 0)
+-				return -1;
++				goto out;
+ 			continue;
+ 		}
+ 
+ 		if (tar_append_file(t, realpath,
+ 				    (savedir ? savepath : NULL)) != 0)
+-			return -1;
++			goto out;
+ 	}
+ 
+-	closedir(dp);
++	ret = 0;
+ 
+-	return 0;
++out:
++	closedir(dp);
++	return ret;
+ }
+ 
+ 
+
+From bb179c6c72956389dfc9211f725d70eaf53ab84a Mon Sep 17 00:00:00 2001
+From: Andrey Kolyshkin <a.kolyshkin@semrush.com>
+Date: Fri, 2 Oct 2015 19:07:54 +0300
+Subject: [PATCH 21/24] Fixed read and skip files more then 4Gb
+
+---
+ lib/extract.c | 5 ++---
+ lib/libtar.h  | 7 ++-----
+ lib/util.c    | 9 +++++++++
+ 3 files changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/lib/extract.c b/lib/extract.c
+index 4ff1a95..ab8b3e1 100644
+--- a/lib/extract.c
++++ b/lib/extract.c
+@@ -85,7 +85,6 @@ tar_set_file_perms(TAR *t, char *realname)
+ 	return 0;
+ }
+ 
+-
+ /* switchboard */
+ int
+ tar_extract_file(TAR *t, char *realname)
+@@ -159,7 +158,7 @@ tar_extract_regfile(TAR *t, char *realname)
+ 	uid_t uid;
+ 	gid_t gid;
+ 	int fdout;
+-	int i, k;
++	ssize_t i, k;
+ 	char buf[T_BLOCKSIZE];
+ 	char *filename;
+ 
+@@ -257,7 +256,7 @@ tar_extract_regfile(TAR *t, char *realname)
+ int
+ tar_skip_regfile(TAR *t)
+ {
+-	int i, k;
++	ssize_t i, k;
+ 	size_t size;
+ 	char buf[T_BLOCKSIZE];
+ 
+diff --git a/lib/libtar.h b/lib/libtar.h
+index cb60530..cf3fd70 100644
+--- a/lib/libtar.h
++++ b/lib/libtar.h
+@@ -185,11 +185,7 @@ int th_write(TAR *t);
+ 
+ /* decode tar header info */
+ #define th_get_crc(t) oct_to_int((t)->th_buf.chksum)
+-/* We cast from int (what oct_to_int() returns) to
+-   unsigned int, to avoid unwieldy sign extensions
+-   from occurring on systems where size_t is bigger than int,
+-   since th_get_size() is often stored into a size_t. */
+-#define th_get_size(t) ((unsigned int)oct_to_int((t)->th_buf.size))
++#define th_get_size(t) oct_to_size((t)->th_buf.size)
+ #define th_get_mtime(t) oct_to_int((t)->th_buf.mtime)
+ #define th_get_devmajor(t) oct_to_int((t)->th_buf.devmajor)
+ #define th_get_devminor(t) oct_to_int((t)->th_buf.devminor)
+@@ -282,6 +278,7 @@ int th_signed_crc_calc(TAR *t);
+ 
+ /* string-octal to integer conversion */
+ int oct_to_int(char *oct);
++size_t oct_to_size(char *oct);
+ 
+ /* integer to NULL-terminated string-octal conversion */
+ #define int_to_oct(num, oct, octlen) \
+diff --git a/lib/util.c b/lib/util.c
+index 37e730b..6bf9ce5 100644
+--- a/lib/util.c
++++ b/lib/util.c
+@@ -151,6 +151,15 @@ oct_to_int(char *oct)
+ 	return sscanf(oct, "%o", &i) == 1 ? i : 0;
+ }
+ 
++/* string-octal to size_t conversion */
++size_t
++oct_to_size(char *oct)
++{
++	size_t i;
++
++	return sscanf(oct, "%lo", &i) == 1 ? i : 0;
++}
++
+ 
+ /* integer to string-octal conversion, no NULL */
+ void
+
+From 65ad5df40854ba3ab4ac1a0dfb98ee448fff653e Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Mon, 5 Oct 2015 09:04:45 +0200
+Subject: [PATCH 22/24] Fix sscanf type modifier for size_t
+
+Use the C99 type modifier for size_t (z) instead of long (l).
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/util.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/lib/util.c b/lib/util.c
+index 6bf9ce5..9823cab 100644
+--- a/lib/util.c
++++ b/lib/util.c
+@@ -157,7 +157,7 @@ oct_to_size(char *oct)
+ {
+ 	size_t i;
+ 
+-	return sscanf(oct, "%lo", &i) == 1 ? i : 0;
++	return sscanf(oct, "%zo", &i) == 1 ? i : 0;
+ }
+ 
+ 
+
+From 9c2e044833c5e908f5be0a77991b08849021793e Mon Sep 17 00:00:00 2001
+From: "Steinar H. Gunderson" <sesse@debian.org>
+Date: Sun, 17 Jul 2016 13:31:29 +0200
+Subject: [PATCH 23/24] Detect old-style GNU headers correctly
+
+Those appear in incremental archives and use the bytes that the
+new-style headers use for the prefix field for other fields.
+
+Patch authored by Steinar H. Gunderson.
+
+Source: https://sources.debian.net/src/libtar/1.2.20-5/debian/patches/oldgnu_prefix.patch/
+Reference: https://bugs.debian.org/763119
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/decode.c | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/lib/decode.c b/lib/decode.c
+index edd5f2e..4caabae 100644
+--- a/lib/decode.c
++++ b/lib/decode.c
+@@ -68,7 +68,14 @@ th_get_pathname(TAR *t)
+ 			return NULL;
+ 	}
+ 
+-	if (t->th_buf.prefix[0] == '\0')
++	/*
++	 * Old GNU headers (also used by newer GNU tar when doing incremental
++	 * dumps) use the POSIX prefix field for many other things, such as
++	 * mtime and ctime. New-style GNU headers don't, but also don't use the
++	 * POSIX prefix field. Thus, only honor the prefix field if the archive
++	 * is actually a POSIX archive. This is the same logic as GNU tar uses.
++	 */
++	if (strncmp(t->th_buf.magic, TMAGIC, TMAGLEN - 1) != 0 || t->th_buf.prefix[0] == '\0')
+ 	{
+ 		snprintf(t->th_pathname, MAXPATHLEN, "%.100s", t->th_buf.name);
+ 	}
+
+From 6379b5d2ae777dad576aeae70566740670057821 Mon Sep 17 00:00:00 2001
+From: Tobias Klauser <tklauser@distanz.ch>
+Date: Wed, 3 Apr 2019 14:00:43 +0200
+Subject: [PATCH 24/24] Wrap ino_hash and dev_hash for libtar_hash_new to match
+ function type
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Fixes the following gcc 8 warnings:
+
+append.c: In function ‘tar_append_file’:
+append.c:109:35: warning: cast between incompatible function types from ‘int (*)(ino_t *)’ {aka ‘int (*)(long unsigned int *)’} to ‘unsigned int (*)(void *, unsigned int)’ [-Wcast-function-type]
+   td->td_h = libtar_hash_new(256, (libtar_hashfunc_t)ino_hash);
+                                   ^
+handle.c: In function ‘tar_init’:
+handle.c:52:33: warning: cast between incompatible function types from ‘int (*)(dev_t *)’ {aka ‘int (*)(long unsigned int *)’} to ‘unsigned int (*)(void *, unsigned int)’ [-Wcast-function-type]
+   (*t)->h = libtar_hash_new(16, (libtar_hashfunc_t)dev_hash);
+
+Signed-off-by: Tobias Klauser <tklauser@distanz.ch>
+---
+ lib/append.c | 7 ++++++-
+ lib/handle.c | 7 ++++++-
+ 2 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/lib/append.c b/lib/append.c
+index 00c9aef..352dba4 100644
+--- a/lib/append.c
++++ b/lib/append.c
+@@ -53,6 +53,11 @@ tar_dev_free(tar_dev_t *tdp)
+ 	free(tdp);
+ }
+ 
++static unsigned int ino_hash_wrap(void *p, unsigned int n)
++{
++	(void)n;
++	return (unsigned int)ino_hash(p);
++}
+ 
+ /* appends a file to the tar archive */
+ int
+@@ -110,7 +115,7 @@ tar_append_file(TAR *t, const char *realname, const char *savename)
+ 		if (td == NULL)
+ 			return -1;
+ 		td->td_dev = s.st_dev;
+-		td->td_h = libtar_hash_new(256, (libtar_hashfunc_t)ino_hash);
++		td->td_h = libtar_hash_new(256, ino_hash_wrap);
+ 		if (td->td_h == NULL) {
+ 			free(td);
+ 			return -1;
+diff --git a/lib/handle.c b/lib/handle.c
+index 28a7dc2..fce84be 100644
+--- a/lib/handle.c
++++ b/lib/handle.c
+@@ -29,6 +29,11 @@ const char libtar_version[] = PACKAGE_VERSION;
+ 
+ static tartype_t default_type = { open, close, read, write };
+ 
++static unsigned int dev_hash_wrap(void *p, unsigned int n)
++{
++	(void)n;
++	return (unsigned int)dev_hash(p);
++}
+ 
+ static int
+ tar_init(TAR **t, const char *pathname, tartype_t *type,
+@@ -53,7 +58,7 @@ tar_init(TAR **t, const char *pathname, tartype_t *type,
+ 		(*t)->h = libtar_hash_new(256,
+ 					  (libtar_hashfunc_t)path_hashfunc);
+ 	else
+-		(*t)->h = libtar_hash_new(16, (libtar_hashfunc_t)dev_hash);
++		(*t)->h = libtar_hash_new(16, dev_hash_wrap);
+ 	if ((*t)->h == NULL)
+ 	{
+ 		free(*t);

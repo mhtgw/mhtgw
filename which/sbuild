@@ -1,0 +1,61 @@
+pkgname=which
+pkgver=2.21
+source=("https://ftp.gnu.org/gnu/which/which-$pkgver.tar.gz")
+
+build() {
+cd which-$pkgver
+./configure --help
+
+#chown -R root:root .
+#find . \
+#  \( -perm 777 -o -perm 775 -o -perm 711 -o -perm 555 -o -perm 511 \) \
+#  -exec chmod 755 {} \; -o \
+#  \( -perm 666 -o -perm 664 -o -perm 600 -o -perm 444 -o -perm 440 -o -perm 400 \) \
+#  -exec chmod 644 {} \;
+
+CFLAGS=-O2 \
+./configure \
+  --prefix=/usr \
+  --infodir=/usr/info \
+  --mandir=/usr/man \
+  --build=$ARCH-slackware-linux
+
+make || exit 1
+make install DESTDIR=$PKG || exit 1
+
+mkdir $PKG/bin
+mv $PKG/usr/bin/which $PKG/bin
+( cd $PKG/usr/bin ; ln -sf ../../bin/which which )
+
+# Compress and link manpages, if any:
+#if [ -d $PKG/usr/man ]; then
+#  ( cd $PKG/usr/man
+#    for manpagedir in $(find . -type d -name "man*") ; do
+#      ( cd $manpagedir
+#        for eachpage in $( find . -type l -maxdepth 1) ; do
+#          ln -s $( readlink $eachpage ).gz $eachpage.gz
+#          rm $eachpage
+#        done
+#        gzip -9 *.?
+#      )
+#    done
+#  )
+#fi
+
+# Compress info files, if any:
+#if [ -d $PKG/usr/info ]; then
+#  ( cd $PKG/usr/info
+#    rm -f dir
+#    gzip -9 *
+#  )
+#fi
+
+mkdir -p $PKG/usr/doc/which-$VERSION
+cp -a \
+  AUTHORS COPYING EXAMPLES NEWS README README.alias \
+  $PKG/usr/doc/which-$VERSION
+
+# Strip everything for good measure:
+#find $PKG | xargs file | grep -e "executable" -e "shared object" \
+#  | grep ELF | cut -f 1 -d : | xargs strip --strip-unneeded 2> /dev/null
+}

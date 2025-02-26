@@ -1,0 +1,18 @@
+pkgname=libtar
+pkgver=1.2.20
+depends=('zlib')
+source=("libtar-${pkgver}.tar.gz"
+        "libtar-${pkgver}-patch-updates-20190403.patch")
+
+build() {
+  cd libtar-${pkgver}
+
+  patch -p1 < ../libtar-${pkgver}-patch-updates-20190403.patch
+  autoreconf -fi
+  ./configure --help
+  ./configure --prefix=/usr --mandir=/usr/man --libdir=/usr/lib64 --enable-shared --enable-static --disable-encap --disable-epkg-install
+  make
+
+  make DESTDIR=$PKG install
+  install -D -m0644 COPYRIGHT $PKG/usr/share/licenses/${pkgname}/LICENSE
+}

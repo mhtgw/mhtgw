@@ -1,0 +1,3 @@
+[repo]
+Server = ftp://ftp.mhtgw.org/repo/os/x86_64
+Server = http://http.mhtgw.org/repo/os/x86_64
